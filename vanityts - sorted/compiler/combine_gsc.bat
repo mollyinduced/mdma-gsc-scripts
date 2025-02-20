@@ -4,6 +4,7 @@ setlocal enabledelayedexpansion
 echo =====================================
 echo        GSC File Compiler v1.0.0
 echo            by mollyinduced
+echo            mdma.rip/discord
 echo =====================================
 echo.
 
