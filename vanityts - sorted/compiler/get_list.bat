@@ -1,8 +1,12 @@
 @echo off
 setlocal enabledelayedexpansion
 
+
+echo.
 echo =====================================
-echo    GSC File Lister (Main First)
+echo          GSC File Lister 1.0.0
+echo            by mollyinduced
+echo            mdma.rip/discord
 echo =====================================
 echo.
 
