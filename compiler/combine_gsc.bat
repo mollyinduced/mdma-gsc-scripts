@@ -8,7 +8,7 @@ echo.
 
 rem Set directories
 set "INPUT_DIR=..\project"
-set "OUTPUT_FILE=..\vanityts_sorted.gsc"  rem Output file outside compiler and project
+set "OUTPUT_FILE=..\combined.gsc"  rem Output file outside compiler and project
 
 rem Clear output file if it exists
 if exist "%OUTPUT_FILE%" (

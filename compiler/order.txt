@@ -1,0 +1,13 @@
+main.gsc 
+animations.gsc 
+barriers.gsc 
+bots.gsc 
+collisions.gsc 
+drawing.gsc 
+functions.gsc 
+join.gsc 
+menu.gsc 
+overflowfix.gsc 
+patches.gsc 
+tpflags.gsc 
+utils.gsc 
