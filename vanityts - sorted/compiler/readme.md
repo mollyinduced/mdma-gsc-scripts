@@ -2,6 +2,8 @@
 
 ## Version: 1.0.0
 
+This was made for Plutonium r4542 since they've updated the game for most GSC compatiblity.
+
 This script automates the process of combining multiple GSC script files into a single `combined.gsc` file. The order of files can be controlled using `order.txt`.
 
 ## File Hierarchy
