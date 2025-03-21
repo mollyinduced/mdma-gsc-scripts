@@ -1,5 +1,7 @@
 // source made by mdma.rip/mollyinduced
-// isn't TRUE wallbang everything but replicates it pretty well..
+// isn't true wallbang everything but replicates it pretty well..
+
+#include maps\mp\_utility;
 
 init()
 {
@@ -11,68 +13,68 @@ onplayerconnect()
     for(;;)
     {
         level waittill("connected", player);
-        // call for method to be ran on player
-        player thread wallbangeverything(); 
+        player thread enable_wallbang();
     }
 }
 
-wallbangeverything() {
+enable_wallbang() 
+{
     self endon("disconnect");
 
-    while (true)
+    for(;;)
     {
-        self waittill("weapon_fired", weapon);
+        self waittill("weapon_fired", gun);
 
-        // weapon check (remove if you want)
-        if (!issniper(weapon)) { continue; }
+        // valid weapon
+        // if (!is_sniper_weapon(gun)) { continue; }
 
-        // bot check
-        if (IsDefined(self.pers["isBot"]) && self.pers["isBot"]) { continue; }
+        // ignore bots
+        if (isdefined(self.pers["isbot"]) && self.pers["isbot"]) { continue; }
 
-        angles2f = anglestoforward(self getplayerangles());
-        eye = self geteye();
-        savedpos = [];
-        savedpos[0] = bullettrace(eye, eye + vectorscale(angles2f, 1000000), false, self) ["position"];
+        fwd_direction = anglestoforward(self getplayerangles());
+        eye_position = self geteye();
+        trace_points = [];
+        trace_points[0] = bullettrace(eye_position, eye_position + vector_multiply(fwd_direction, 1000000), false, self)["position"];
 
-        a = 1;
-        while (a < 10) {
-            prevPos = savedpos[a - 1];
-            traceResult = bullettrace(prevPos, prevPos + vectorscale(angles2f, 1000000), true, self);
-            savedpos[a] = traceResult["position"];
+        step = 1;
+        while (step < 25)
+        {
+            last_pos = trace_points[step - 1];
+            trace_result = bullettrace(last_pos, last_pos + vector_multiply(fwd_direction, 1000000), true, self);
+            trace_points[step] = trace_result["position"];
 
-            while (distance(savedpos[a - 1], savedpos[a]) < 1) {
-                savedpos[a] += vectorscale(angles2f, 0.25);
+            while (distance(trace_points[step - 1], trace_points[step]) < 1) 
+            {
+                trace_points[step] += vector_multiply(fwd_direction, 0.25);
             }
 
-            if (savedpos[a] != savedpos[a - 1]) {
-                magicbullet(self getcurrentweapon(), savedpos[a], vectorscale(angles2f, 1000000), self);
+            if (trace_points[step] != trace_points[step - 1]) 
+            {
+                magicbullet(self getcurrentweapon(), trace_points[step], vector_multiply(fwd_direction, 1000000), self);
             }
 
-            a++;
+            step++;
         }
-        waitframe();
+        wait 0.05;
     }
 }
 
-
-issniper(weapon) {
-	if (!(IsDefined(weapon))) {
+is_sniper_weapon(gun) 
+{
+	if (!(isdefined(gun))) {
 		return false;
 	}
 
-	weapon_class = getweaponclass(weapon);
-	if (weapon == "hatchet_mp" || issubstr(weapon, "saritch") || issubstr(weapon, "sa58_") || weapon_class == "weapon_sniper") {
+	weapon_type = getweaponclass(gun);
+	if (gun == "hatchet_mp" || issubstr(gun, "saritch") || issubstr(gun, "sa58_") || weapon_type == "weapon_sniper") {
 		return true;
 	}
 
 	return false;
 }
 
-vectorscale(vector, scale) {
-	vector = (vector[0] * scale, vector[1] * scale, vector[2] * scale);
-	return vector;
-}
-
-waitframe() {
-    wait 0.05;
+vector_multiply(vec, factor) 
+{
+	vec = (vec[0] * factor, vec[1] * factor, vec[2] * factor);
+	return vec;
 }
