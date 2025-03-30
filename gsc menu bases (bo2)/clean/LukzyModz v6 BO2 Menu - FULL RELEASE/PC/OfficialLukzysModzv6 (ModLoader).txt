@@ -1,0 +1,3318 @@
+#include maps/mp/_utility;
+#include common_scripts/utility;
+#include maps/mp/gametypes/_hud_util;
+#include maps/mp/gametypes/_weapons; 
+
+
+init()
+{
+    level thread onplayerconnect();
+	precacheShader("rank_prestige15");
+    precacheVehicle("heli_guard_mp");
+	precacheModel("veh_t6_drone_overwatch_light");
+	precacheModel("defaultactor");
+    precacheShader("rank_prestige10");
+    precacheShader("line_horizontal");
+    precacheModel("projectile_hellfire_missile");
+    precacheModel("t6_wpn_supply_drop_ally");
+    precacheModel("mp_flag_green");
+    precacheModel("mp_flag_red");
+    precacheShader("progress_bar_bg");
+    level.icontest = "progress_bar_bg";
+    level.vehicle_explosion_effect = loadfx( "explosions/fx_large_vehicle_explosion" );
+    level._effect[ "flak20_fire_fx" ] = loadfx( "weapon/tracer/fx_tracer_flak_single_noExp" );
+    precacheModel("german_shepherd");
+    PrecacheModel("p_glo_scavenger_pack_obj");
+    PrecacheModel("mp_flag_neutral");
+    PrecacheModel("mp_flag_green");
+    PrecacheModel("mp_flag_red");
+    PrecacheModel("p6_dogtags");
+    PrecacheModel("veh_t6_air_v78_vtol_killstreak");
+    PrecacheModel("veh_t6_drone_uav");
+    PrecacheModel("defaultvehicle");
+}
+
+onPlayerConnect()
+{
+	for(;;)
+	{	
+    	level waittill("connecting", player);
+    	player thread onPlayerSpawned();
+    	player thread monitorBounce();
+    	player thread WelcomeHomeFront(); //Credits to Djota
+    	player thread playerVars();
+		// Who Has Menu
+    	if(player isHost() || player.name == "LukzyMods")
+                player.status = "Host";
+        else
+        {
+        		player.status = "Unverified";
+        }
+	}
+}
+
+
+onPlayerSpawned()
+{	
+    self endon("disconnect");
+    level endon("game_ended");
+    self.MenuInit = false;
+    for(;;)
+    {
+	    self waittill("spawned_player");
+	    self welcomeMessage();
+	    self thread playerDeath();
+	    if (!self.MenuInit && !player.status == "Unverified") 
+        {
+        	wait (5); //Waits 5 Seconds Before Menu Can Be Opened (Helps With Flying Into Map)
+            self.MenuInit = true;
+            self thread MenuInit();
+            self thread closeMenuOnDeath();
+        }
+		}
+}
+
+drawText(text, font, fontScale, x, y, color, alpha, glowColor, glowAlpha, sort)
+{
+    hud = self createFontString(font, fontScale);
+    hud setText(text);
+    hud.x = x;
+    hud.y = y;
+    hud.color = color;
+    hud.alpha = alpha;
+    hud.glowColor = glowColor;
+    hud.glowAlpha = glowAlpha;
+    hud.sort = sort;
+    hud.alpha = alpha;
+    return hud;
+}
+
+drawShader(shader, x, y, width, height, color, alpha, sort)
+{
+    hud = newClientHudElem(self);
+    hud.elemtype = "icon";
+    hud.color = color;
+    hud.alpha = alpha;
+    hud.sort = sort;
+    hud.children = [];
+    hud setParent(level.uiParent);
+    hud setShader(shader, width, height);
+    hud.x = x;
+    hud.y = y;
+    return hud;
+}
+
+verificationToNum(status)
+{
+	if (status == "Host")
+		return 5;
+	if (status == "Co-Host")
+		return 4;
+	if (status == "Admin")
+		return 3;
+	if (status == "VIP")
+		return 2;
+	if (status == "Verified")
+		return 1;
+	else
+		return 0;
+}
+
+verificationToColor(status)
+{
+	if (status == "Host")
+		return "^2Host";
+	if (status == "Co-Host")
+		return "^5Co-Host";
+	if (status == "Admin")
+		return "^1Admin";
+	if (status == "VIP")
+		return "^4VIP";
+	if (status == "Verified")
+		return "^3Verified";
+	else
+		return "";
+}
+
+changeVerificationMenu(player, verlevel)
+{
+	if( player.status != verlevel && !player isHost())
+	{		
+		player.status = verlevel;
+	
+		self.menu.title destroy();
+		self.menu.title = drawText("[" + verificationToColor(player.status) + "^7] " + getPlayerName(player), "objective", 2, -100, 30, (1, 1, 1), 0, (0, 0.58, 1), 1, 3);
+		self.menu.title FadeOverTime(0.3);
+		self.menu.title.alpha = 1;
+		
+		if(player.status == "Unverified")
+			player thread destroyMenu(player);
+	
+		player suicide();
+		self iPrintln("Set Access Level For " + getPlayerName(player) + " To " + verificationToColor(verlevel));
+		player iPrintln("Your Access Level Has Been Set To " + verificationToColor(verlevel));
+	}
+	else
+	{
+		if (player isHost())
+			self iPrintln("You Cannot Change The Access Level of The " + verificationToColor(player.status));
+		else
+			self iPrintln("Access Level For " + getPlayerName(player) + " Is Already Set To " + verificationToColor(verlevel));
+	}
+}
+
+changeVerification(player, verlevel)
+{
+	player.status = verlevel;
+}
+
+getPlayerName(player)
+{
+	playerName = getSubStr(player.name, 0, player.name.size);
+	for(i=0; i < playerName.size; i++)
+	{
+		if(playerName[i] == "]")
+			break;
+	}
+	if(playerName.size != i)
+		playerName = getSubStr(playerName, i + 1, playerName.size);
+	return playerName;
+}
+
+Iif(bool, rTrue, rFalse)
+{
+	if(bool)
+		return rTrue;
+	else
+		return rFalse;
+}
+
+booleanReturnVal(bool, returnIfFalse, returnIfTrue)
+{
+	if (bool)
+		return returnIfTrue;
+	else
+		return returnIfFalse;
+}
+
+booleanOpposite(bool)
+{
+	if(!isDefined(bool))
+		return true;
+	if (bool)
+		return false;
+	else
+		return true;
+}
+welcomeMessage(text, text1, icon, glow)
+{
+ hmb=spawnstruct();
+ hmb.titleText= "^5Welcome ^7" + self.name + " ^5To ^2Official^5Lukzys^1Modz^4v6";
+ hmb.notifyText= "Your Status Is: " + verificationToColor(self.status);
+ hmb.iconName= "rank_prestige14";
+ hmb.glowColor= (0, 255, 255);
+ hmb.hideWhenInMenu=true;
+ hmb.archived=false;
+ self thread maps\mp\gametypes\_hud_message::notifyMessage(hmb);
+}
+
+CreateMenu()
+{
+	self add_menu("Main Menu", undefined, "Unverified");
+	self add_option("Main Menu", "^1Main ^5Modz", ::submenu, "MainMods", "Main Menu");
+	self add_option("Main Menu", "^2Fun ^6Modz", ::submenu, "FunMenu", "Fun Menu");
+	self add_option("Main Menu", "^3Model ^1Modz", ::submenu, "ModelMenu", "Model Menu");
+	self add_option("Main Menu", "^4Lobby ^2Modz", ::submenu, "LobbyMenu", "Lobby Menu");
+	self add_option("Main Menu", "^5Account ^3Menu", ::submenu, "AccountM", "Account Menu");
+	self add_option("Main Menu", "^6Killstreaks ^5Menu", ::submenu, "Killstreaks Menu", "Killstreaks Menu");
+	self add_option("Main Menu", "^4Aimbot ^1Modz", ::submenu, "AimbotMenu", "Aimbot Menu");
+	self add_option("Main Menu", "^3Bot ^4Menu", ::submenu, "BotMenu", "Bot Menu");
+	self add_option("Main Menu", "^2Bullet ^1Modz", ::submenu, "BulletM", "Bullet Menu");
+	self add_option("Main Menu", "^5Weapon ^4Menu", ::submenu, "weaponM", "Weapon Menu");
+	self add_option("Main Menu", "^1Map ^3Menu", ::submenu, "MapsMenu", "Map Menu");
+        self add_option("Main Menu", "^6Theme ^2Modz", ::submenu, "Theme Menu", "Theme Menu");
+	self add_option("Main Menu", "^2Message ^6Menu", ::submenu, "MessageM", "Message Menu");
+	self add_option("Main Menu", "^4All ^5Players", ::submenu, "AllPlayers", "All Players");
+	self add_option("Main Menu", "^5Players ^4Menu", ::submenu, "PlayersMenu", "Players Menu");
+
+	self add_menu("MainMods", "Main Menu", "VIP");
+	self add_option("MainMods", "God Mode", ::Toggle_God);
+    self add_option("MainMods", "Infinite Ammo", ::unlimited_ammo);
+	self add_option("MainMods", "Third Person", ::ThirdPerson);
+    self add_option("MainMods", "Change Class In Game", ::ChangeClass);
+    self add_option("MainMods", "All Perks", ::giveAllPerks);
+	self add_option("MainMods", "Toggle Visions", ::togglevision);
+    self add_option("MainMods", "Toggle Pro Mod", ::togglefovvvvv);
+    self add_option("MainMods", "MultiJump", ::Toggle_Multijump);
+    self add_option("MainMods", "Invisible", ::initInvisible);
+	self add_option("MainMods", "Gun On Left Side", ::ToggleLeft);
+    self add_option("MainMods", "Clone Your Self", ::spawnClone);
+    self add_option("MainMods", "Kill Your Self!", ::commitSuicide);
+	self add_option("MainMods", "Speed x2", ::SpeedX2);
+	self add_option("MainMods", "Show FPS", ::ShowFPS);
+    self add_option("MainMods", "Teleport", ::doTeleport);
+    self add_option("MainMods", "Advanced NoClip", ::Noclip);
+    self add_option("MainMods", "Hear everyone", ::hearallplayers);
+
+	self add_menu("FunMenu", "Main Menu", "Admin");
+    self add_option("FunMenu", "^4Hulk Mode", ::hulktoggle);
+	self add_option("FunMenu", "^4Health Bar", ::HealthBar);
+	self add_option("FunMenu", "^4Save & Load Location", ::saveandload);
+    self add_option("FunMenu", "^4JetPack", ::doJetPack);
+	self add_option("FunMenu", "^4Plant Bomb (^1S&D^7)", ::PlantBomb);
+	self add_option("FunMenu", "^4Defuse Bomb (^1S&D^7)", ::DefuseBomb);
+	self add_option("FunMenu", "^4Smoke Monster", ::initSmokeMonster);
+	self add_option("FunMenu", "^4Earthquake Mode", ::Quake);
+	self add_option("FunMenu", "^4Forge Mode", ::ForgeON);
+	self add_option("FunMenu", "^4Floaters ^1(Enable Only)", ::EnableFloaters);
+	
+	self add_menu("ModelMenu", "Main Menu", "VIP");
+	self add_option("ModelMenu", "^4Dog Model", ::spawnPlayerModel, self, "german_shepherd");
+	self add_option("ModelMenu", "^4Scavenger Pack", ::spawnPlayerModel, self, "p_glo_scavenger_pack_obj");
+	self add_option("ModelMenu", "^4Flag Nuetral", ::spawnPlayerModel, self, "mp_flag_neutral");
+	self add_option("ModelMenu", "^4Green Flag", ::spawnPlayerModel, self, "mp_flag_green");
+	self add_option("ModelMenu", "^4Red Flag", ::spawnPlayerModel, self, "mp_flag_red");
+	self add_option("ModelMenu", "^4Dogtag", ::spawnPlayerModel, self, "p6_dogtags");
+	self add_option("ModelMenu", "^4UAV", ::spawnPlayerModel, self, "veh_t6_drone_uav");
+	self add_option("ModelMenu", "^4VTOL Warship", ::spawnPlayerModel, self, "veh_t6_air_v78_vtol_killstreak");
+	self add_option("ModelMenu", "^4Defualt Vehicle", ::spawnPlayerModel, self, "defaultvehicle");
+	
+	self add_menu("LobbyMenu", "Main Menu", "Co-Host");
+    self add_option("LobbyMenu", "^4Anti Quit", ::ToggleRageQuit);
+    self add_option("LobbyMenu", "^4Super Jump", ::ToggleSuperJump);
+	self add_option("LobbyMenu", "^4Super Speed", ::superSpeed);
+    self add_option("LobbyMenu", "^4Timescale", ::changeTimescale);
+    self add_option("LobbyMenu", "^4Force Host", ::forceHost);
+    self add_option("LobbyMenu", "^4Fast Restart", ::fastRestart);
+    self add_option("LobbyMenu", "^4Unlimited Game", ::Inf_Game);
+    self add_option("LobbyMenu", "^4BIG XP", ::BigXP3);
+    self add_option("LobbyMenu", "^4News Bar", ::NewsBarsLol);
+    self add_option("LobbyMenu", "^4Gravity", ::gravity);
+    self add_option("LobbyMenu", "^4DoHeart", ::doHeart);
+    self add_option("LobbyMenu", "^4Long Melee", ::meleerange);
+    self add_option("LobbyMenu", "^4TradeMark", ::doTradeMark);
+    
+    self add_menu("AccountM", "Main Menu", "Co-Host");
+    self add_option("AccountM", "^4Unlock all Trophies", ::unlockAllCheevos);
+    self add_option("AccountM", "^4Prestige Master", ::doMaster);
+    self add_option("AccountM", "^4Level 55", ::doRank);
+    
+    self add_menu("Killstreaks Menu", "Main Menu", "Admin");
+	self add_option("Killstreaks Menu", "^4Spyplane", ::GiveUAV);
+	self add_option("Killstreaks Menu", "^4RC-XD", ::GiveRC);
+	self add_option("Killstreaks Menu", "^4Hunter Killer", ::GiveHunt);
+	self add_option("Killstreaks Menu", "^4Care Package", ::GiveCare);
+	self add_option("Killstreaks Menu", "^4CounterUAV", ::GiveCUAV);
+	self add_option("Killstreaks Menu", "^4Guardian", ::GiveGaurd);
+	self add_option("Killstreaks Menu", "^4HellStorm", ::GiveHell);
+	self add_option("Killstreaks Menu", "^4Lightning Strike", ::GiveLS);
+	self add_option("Killstreaks Menu", "^4Sentry Gun", ::GiveSG);
+	self add_option("Killstreaks Menu", "^4AGR", ::GiveAG);
+	self add_option("Killstreaks Menu", "^4Next Page", ::submenu, "Killstreak Menu1", "Killstreak Menu1");
+
+	self add_menu("Killstreak Menu1", "Main Menu", "Admin");
+    self add_option("Killstreak Menu1", "^4Stealth Chopper", ::GiveSC);
+    self add_option("Killstreak Menu1", "^4VSAT", ::GiveVSAT);
+    self add_option("Killstreak Menu1", "^4Escort Drone", ::GiveED);
+    self add_option("Killstreak Menu1", "^4Give EMP", ::GiveEMP);
+    self add_option("Killstreak Menu1", "^4Warthog", ::GiveWH);
+    self add_option("Killstreak Menu1", "^4Lodestar", ::GiveLST);
+    self add_option("Killstreak Menu1", "^4VTOL Warship", ::GiveVW);
+    self add_option("Killstreak Menu1", "^4Dogs", ::GiveDogs);
+    self add_option("Killstreak Menu1", "^4Swarm", ::GiveSwarm);
+	
+	self add_menu("AimbotMenu", "Main Menu", "Admin");
+    self add_option("AimbotMenu", "^2TrickShot ^5Aimbot ^1(^1FFA Only)", ::initaimBot1);
+    self add_option("AimbotMenu", "^2Unfair ^5Aimbot ^1(^1Host Only)", ::doAimbots);
+    self add_option("AimbotMenu", "^2Explosive Bullets", ::toggleEB);
+    self add_option("AimbotMenu", "^2EB Type", ::SwitchEB);
+    
+    self add_menu("BotMenu", "Main Menu", "Co-Host");
+    self add_option("BotMenu", "^4Spawn 1 Bot", ::spawnBots, 1);
+    self add_option("BotMenu", "^4Spawn 2 Bot", ::spawnBots, 2);
+    self add_option("BotMenu", "^4Spawn 3 Bot", ::spawnBots, 3);
+    self add_option("BotMenu", "^4Spawn 4 Bot", ::spawnBots, 4);
+    self add_option("BotMenu", "^4Spawn 5 Bot", ::spawnBots, 5);
+    self add_option("BotMenu", "^4Spawn 6 Bot", ::spawnBots, 6);
+    self add_option("BotMenu", "^4Spawn 7 Bot", ::spawnBots, 7);
+    self add_option("BotMenu", "^4Spawn 8 Bot", ::spawnBots, 8);
+    self add_option("BotMenu", "^4Spawn 9 Bot", ::spawnBots, 9);
+    self add_option("BotMenu", "^4Spawn 10 Bot", ::spawnBots, 10);
+    self add_option("BotMenu", "^4Spawn 11 Bot", ::spawnBots, 11);
+    self add_option("BotMenu", "^4Spawn 12 Bot", ::spawnBots, 12);
+    self add_option("BotMenu", "^4Spawn 13 Bot", ::spawnBots, 13);
+    self add_option("BotMenu", "^4Spawn 14 Bot", ::spawnBots, 14);
+    self add_option("BotMenu", "^4Spawn 15 Bot", ::spawnBots, 15);
+    self add_option("BotMenu", "^4Spawn 18 Bot", ::spawnBots, 18);
+    
+    self add_menu("BulletM", "Main Menu", "Admin");
+    self add_option("BulletM", "^4Real CP Bullets", ::doCareMaker2);
+    self add_option("BulletM", "^4Nuke Bullets", ::initNukeBullets);
+    self add_option("BulletM", "^4EMP Bullets", ::initEMPBullets);
+    self add_option("BulletM", "^4RPG Bullets", ::initRPGBullet);
+    self add_option("BulletM", "^4Swarm Bullets", ::ToggleSwarmGun);
+	
+	self add_menu("weaponM", "Main Menu", "VIP");
+    self add_option("weaponM", "^4Random Camo", ::CamoChanger);
+	self add_option("weaponM", "^4Weapons", ::submenu, "weaponM2", "Weapons");
+	
+	self add_menu("weaponM2", "weaponM", "Admin");
+    self add_option("weaponM2", "^4Death Machine", ::BG_GivePlayerWeapon, "minigun_mp");
+	self add_option("weaponM2", "^4War Machine", ::BG_GivePlayerWeapon, "m32_mp");
+    self add_option("weaponM2", "^4MP7", ::BG_GivePlayerWeapon, "mp7_mp");
+    self add_option("weaponM2", "^4Balista", ::BG_GivePlayerWeapon, "ballista_mp");
+    self add_option("weaponM2", "^4Dsr 50", ::BG_GivePlayerWeapon, "dsr50_mp");
+    self add_option("weaponM2", "^4Knife CS", ::BG_GivePlayerWeapon, "knife_mp");
+    self add_option("weaponM2", "^4AN94", ::BG_GivePlayerWeapon, "an94_mp");
+    self add_option("weaponM2", "^4Peacepeeker", ::BG_GivePlayerWeapon, "peacekeeper_mp");
+    self add_option("weaponM2", "^4Scar-h", ::BG_GivePlayerWeapon, "scar_mp");
+    self add_option("weaponM2", "^4Remington", ::BG_GivePlayerWeapon, "870mcs_mp");
+    self add_option("weaponM2", "^4Vector", ::BG_GivePlayerWeapon, "sf_vector_mp");
+    self add_option("weaponM2", "^4Type95", ::BG_GivePlayerWeapon, "type95_mp");
+    self add_option("weaponM2", "^4Skorpion", ::BG_GivePlayerWeapon, "evoskorpion_mp");
+    self add_option("weaponM2", "^4Riotshield", ::BG_GivePlayerWeapon, "riotshield_mp");
+	self add_option("weaponM2", "Crossbow", ::BG_GivePlayerWeapon, "crossbow_mp");
+	
+	self add_menu("MapsMenu", "Main Menu", "Co-Host");
+    self add_option("MapsMenu", "^4Overflow", ::Overflow);
+	self add_option("MapsMenu", "^4Plaza", ::Plaza);
+    self add_option("MapsMenu", "^4Raid", ::Raid);
+    self add_option("MapsMenu", "^4Slums", ::Slums);
+    self add_option("MapsMenu", "^4Standoff", ::Standoff);
+    self add_option("MapsMenu", "^4Turbine", ::Turbine);
+    self add_option("MapsMenu", "^4Yemen", ::Yemen);
+    self add_option("MapsMenu", "^4Cargo", ::Cargo);
+    self add_option("MapsMenu", "^4Carrier", ::Carrier);
+    self add_option("MapsMenu", "^4Drone", ::Drone);
+    self add_option("MapsMenu", "^4Express", ::Express);
+    self add_option("MapsMenu", "^4Hijacked", ::Hijacked);
+    self add_option("MapsMenu", "^4Meltdown", ::Meltdown);
+    self add_option("MapsMenu", "^4Uplink", ::Uplink);
+    self add_option("MapsMenu", "^5^1DLC Maps", ::submenu, "MapsMenu2", "DLC Maps");
+        
+    self add_menu("MapsMenu2", "MapsMenu", "Co-Host");
+    self add_option("MapsMenu2", "^4Detour", ::Detour);
+    self add_option("MapsMenu2", "^4Cove", ::Cove);
+    self add_option("MapsMenu2", "^4Rush", ::Rush);
+    self add_option("MapsMenu2", "^4Studio", ::Studio);
+    self add_option("MapsMenu2", "^4Magma", ::Magma);
+    self add_option("MapsMenu2", "^4Vertigo", ::Vertigo);
+    self add_option("MapsMenu2", "^4Encore", ::Encore);
+    self add_option("MapsMenu2", "^4Downhill", ::Downhill);
+    self add_option("MapsMenu2", "^4Grind", ::Grind);
+    self add_option("MapsMenu2", "^4Hydro", ::Hydro);
+    self add_option("MapsMenu2", "^4Mirage", ::Mirage);
+    self add_option("MapsMenu2", "^4Frost", ::Frost);
+    self add_option("MapsMenu2", "^4Takeoff", ::Takeoff);
+    self add_option("MapsMenu2", "^4Pod", ::Pod);
+    self add_option("MapsMenu2", "^4Dig", ::Dig);
+    
+    self add_menu("Theme Menu", "Main Menu", "Admin");
+	self add_option("Theme Menu", "^4Red Scroller", ::doRedtheme);
+	self add_option("Theme Menu", "^4Blue Scroller", ::dobluetheme);
+	self add_option("Theme Menu", "^4Green Scroller", ::doGreentheme);
+	self add_option("Theme Menu", "^4Yellow Scroller", ::doYellowtheme);
+	self add_option("Theme Menu", "^4Pink Scroller", ::doPinktheme);
+	self add_option("Theme Menu", "^4Cyan Scroller", ::doCyantheme);
+	self add_option("Theme Menu", "^4Aqua Scroller", ::doAquatheme);
+	self add_option("Theme Menu", "^4Flashing Scroller", ::FlashingTheme);
+        
+    self add_menu("MessageM", "Main Menu", "Admin");
+    self add_option("MessageM", "^5Creator", ::typewritter, "^5Official^4Lukzys^1Modz^2v6 ^7Created By: @OfficialLukzy");
+	self add_option("MessageM", "^5Penis Joke", ::penisjk);
+    self add_option("MessageM", "^1BillCam", ::typewritter, "^1HIT ^7THEM ^8BILLS");
+    self add_option("MessageM", "^5Pussy Joke", ::pussyjk);
+	self add_option("MessageM", "^5Squaker", ::typewritter, "^1PLZ Shut The Fuck Up Squaker");
+	self add_option("MessageM", "^5Yes", ::typewritter, "^2Yes");
+	self add_option("MessageM", "^5NO", ::typewritter, "^1NO");
+	self add_option("MessageM", "^5Want Menu?", ::typewritter, "^5Do You Want Menu?");
+    self add_option("MessageM", "^7<3", ::typewritter, "You Da Bes ^1<3");
+    self add_option("MessageM", "^7Fuck You", ::typewritter, "^1F^2U^3C^7K ^5Y^7O^1U^2!");
+    self add_option("MessageM", "^8Snipers Only", ::typewritter, "^7Use Snipers Only! ^2You Will Be Kicked Otherwise.");
+	self add_option("MessageM", "^5Trickshot", ::typewritter, "^3Trickshot Last!!!");
+    self add_option("MessageM", "^1Next Page", ::submenu, "MessageM2", "Page 2");
+	
+	self add_menu("MessageM2", "Main Menu", "Admin");
+    self add_option("MessageM2", "^2Yes", ::typewritter, "^7Yes.");
+    self add_option("MessageM2", "^5Lukzy", ::typewritter, "^3^5Official^4Lukzy^1Modz^3v6 ^6is ^2The ^1BEST");
+    self add_option("MessageM2", "^1No", ::typewritter, "^5No.");
+    self add_option("MessageM2", "^7Don't Setup", ::typewritter, "^2Don't Setup!");
+    self add_option("MessageM2", "^5Warn Tryhards", ::typewritter, "^1TryHard? i Will Frezze Your Console! STOP NOW...");
+    self add_option("MessageM2", "^3Your A Fag", ::typewritter, "^7Your A Faggot, Kiddo.");
+    self add_option("MessageM2", "^7You Mad?", ::typewritter, "^1You ^5Mad, ^7Bro? ^2You ^3Seem ^7Like ^3It ;)");
+    self add_option("MessageM2", "^1Noob", ::typewritter, "^2YOUR A ^1NOOB!!!");
+    self add_option("MessageM2", "^5Warn Tryhards", ::typewritter, "^1TryHard? i Will Frezze Your Console! STOP NOW...");
+    self add_option("MessageM2", "^5Social Media ^1Page", ::submenu, "MessageM3", "Social Media");
+	
+	self add_menu("MessageM3", "Main Menu", "Admin");
+    self add_option("MessageM3", "^1Youtube", ::typewritter, "^1www.Youtube.com/^7OfficialLukzy");
+    self add_option("MessageM3", "^5Twitter", ::typewritter, "^7www.Twtter.com/^7OfficialLukzy");
+    self add_option("MessageM3", "^2YouNow", ::typewritter, "^2Younow.com/^7Luke-Wayne");
+    self add_option("MessageM3", "^7Twitch", ::typewritter, "^7Twitch.tv/^2OhLukzyy");
+    self add_option("MessageM3", "^5Skype", ::typewritter, "^1Skype - ^5LukzyGaming");
+    self add_option("MessageM3", "^8Steam", ::typewritter, "^1Steam - ^7OfficialLukzy");
+    self add_option("MessageM3", "^7Stream.me", ::typewritter, "^5team.me - ^7OhLukzyy");
+    self add_option("MessageM3", "^5The Homies ^1Page", ::submenu, "MessageM4", "The Homies");
+	
+	self add_menu("MessageM4", "Main Menu", "Admin");
+	self add_option("MessageM4", "^5Swift/Spacey", ::typewritter, "^4The Homie ^1Swifty^5/^3Spacey");
+	self add_option("MessageM4", "^5Venom/Panda", ::typewritter, "^4The Homie ^2Venom^5/^3Panda");
+	
+	self add_menu("AllPlayers", "Main Menu", "Admin");
+	self add_option("AllPlayers", "^4Freeze all", ::freezeall);
+	self add_option("AllPlayers", "^4Unlock All Trophies", ::unlockAllThrophiesAllPlayers);
+	self add_option("AllPlayers", "^4Teleport All", ::TeleportAll);
+	self add_option("AllPlayers", "^4Infinite Ammo All", ::infiniteammoall);
+	self add_option("AllPlayers", "^4Godmode All", ::godmodeall);
+	self add_option("AllPlayers", "^4Kill All", ::killall);
+	self add_option("AllPlayers", "^4Kick All Unverified", ::kickall);
+	
+    self add_menu("PlayersMenu", "Main Menu", "Co-Host");
+	for (i = 0; i < 12; i++)
+	{ self add_menu("pOpt " + i, "PlayersMenu", "Co-Host"); }
+}
+
+updatePlayersMenu()
+{
+	self.menu.menucount["PlayersMenu"] = 0;
+	for (i = 0; i < 12; i++)
+	{
+		player = level.players[i];
+		playerName = getPlayerName(player);
+		
+		playersizefixed = level.players.size - 1;
+		if(self.menu.curs["PlayersMenu"] > playersizefixed)
+		{ 
+			self.menu.scrollerpos["PlayersMenu"] = playersizefixed;
+			self.menu.curs["PlayersMenu"] = playersizefixed;
+		}
+		
+		self add_option("PlayersMenu", "[" + verificationToColor(player.status) + "^7] " + playerName, ::submenu, "pOpt " + i, "[" + verificationToColor(player.status) + "^7] " + playerName);
+	
+		self add_menu_alt("pOpt " + i, "PlayersMenu");
+		self add_option("pOpt " + i, "^4Give Co-Host", ::changeVerificationMenu, player, "Co-Host");
+		self add_option("pOpt " + i, "^4Give Admin", ::changeVerificationMenu, player, "Admin");
+		self add_option("pOpt " + i, "^4Give VIP", ::changeVerificationMenu, player, "VIP");
+		self add_option("pOpt " + i, "^4Verify", ::changeVerificationMenu, player, "Verified");
+		self add_option("pOpt " + i, "^4Unverify", ::changeVerificationMenu, player, "Unverified");
+		self add_option("pOpt " + i, "^4Kick Player", ::kickPlayer, player);
+		self add_option("pOpt " + i, "^4God Mode Player", ::givePlayerGod, player);
+		self add_option("pOpt " + i, "^4Freeze Player", ::freezePlayer, player, true);
+	}
+}
+add_menu_alt(Menu, prevmenu)
+{
+	self.menu.getmenu[Menu] = Menu;
+	self.menu.menucount[Menu] = 0;
+	self.menu.previousmenu[Menu] = prevmenu;
+}
+
+add_menu(Menu, prevmenu, status)
+{
+    self.menu.status[Menu] = status;
+	self.menu.getmenu[Menu] = Menu;
+	self.menu.scrollerpos[Menu] = 0;
+	self.menu.curs[Menu] = 0;
+	self.menu.menucount[Menu] = 0;
+	self.menu.previousmenu[Menu] = prevmenu;
+}
+
+add_option(Menu, Text, Func, arg1, arg2)
+{
+	Menu = self.menu.getmenu[Menu];
+	Num = self.menu.menucount[Menu];
+	self.menu.menuopt[Menu][Num] = Text;
+	self.menu.menufunc[Menu][Num] = Func;
+	self.menu.menuinput[Menu][Num] = arg1;
+	self.menu.menuinput1[Menu][Num] = arg2;
+	self.menu.menucount[Menu] += 1;
+}
+
+updateScrollbar()
+{
+	self.menu.scroller MoveOverTime(0.10);
+	self.menu.scroller.y = 68 + (self.menu.curs[self.menu.currentmenu] * 20.36);
+}
+
+openMenu()
+{
+    self freezeControls(false);
+	
+	self.menu.backgroundinfo FadeOverTime(0.3);
+    self.menu.backgroundinfo.alpha = 1;
+    
+    self.menu.background MoveOverTime(0.8);
+    self.menu.background.y = -50;
+    self.menu.background.alpha = 0.5;
+    
+    self.menu.Sideline1 MoveOverTime(0.8);
+    self.menu.Sideline1.x = 125;
+    self.menu.Sideline1.alpha = 0.6;
+    
+    self.menu.Sideline2 MoveOverTime(0.8);
+    self.menu.Sideline2.x = -125;
+    self.menu.Sideline2.alpha = 0.6;
+    wait 0.5;
+    
+    self StoreText("Main Menu", "Main Menu");
+	
+	self.menu.background1 FadeOverTime(0.03);
+    self.menu.background1.alpha = 0.08;
+
+    self.swagtext FadeOverTime(0.3);
+    self.swagtext.alpha = 0.90;
+
+    self updateScrollbar();
+    self.menu.open = true;
+}
+
+closeMenu()
+{
+    self.menu.options FadeOverTime(0.3);
+    self.menu.options.alpha = 0;
+	
+	self.tez FadeOverTime(0.3);
+    self.tez.alpha = 0;
+    
+    self.menu.background MoveOverTime(0.8);
+    self.menu.background.y = -1000;
+    
+    self.menu.Sideline1 MoveOverTime(0.8);
+    self.menu.Sideline1.x = 1000;
+    
+    self.menu.Sideline2 MoveOverTime(0.8);
+    self.menu.Sideline2.x = -1000;
+	
+	self.menu.background1 FadeOverTime(0.3);
+    self.menu.background1.alpha = 0;
+    
+    self.swagtext FadeOverTime(0.30);
+    self.swagtext.alpha = 0;
+
+    self.menu.title FadeOverTime(0.30);
+    self.menu.title.alpha = 0;
+	
+	self.menu.backgroundinfo FadeOverTime(0.3);
+    self.menu.backgroundinfo.alpha = 0;
+
+	self.menu.scroller MoveOverTime(0.30);
+	self.menu.scroller.y = -510;
+    self.menu.open = false;
+}
+
+destroyMenu(player)
+{
+    player.MenuInit = false;
+    closeMenu();
+	wait 0.3;
+
+	player.menu.options destroy();	
+	player.menu.background1 destroy();
+	player.menu.scroller destroy();
+	player.menu.scroller1 destroy();
+	player.infos destroy();
+	player.menu.Sideline1 destroy();
+	player.menu.Sideline2 destroy();
+	player.menu.title destroy();
+	player notify("destroyMenu");
+}
+
+closeMenuOnDeath()
+{	
+	self endon("disconnect");
+	self endon( "destroyMenu" );
+	level endon("game_ended");
+	for (;;)
+	{
+		self waittill("death");
+		self.menu.closeondeath = true;
+		self submenu("Main Menu", "Main Menu");
+		closeMenu();
+		self.menu.closeondeath = false;
+	}
+}
+StoreShaders()
+{
+	self.menu.background = self drawShader("black", 1, -1000, 250, 500, (1, 0.500, 0), 0, 0);
+	self.menu.scroller = self drawShader("white", 1, -500, 245, 20, (0, 255, 255), 1, 1);
+	self.menu.Sideline1 = self drawShader("white", -1000, -50, 4, 1000, (0, 255, 255), 0, 0);
+	self.menu.Sideline2 = self drawShader("white", 1000, -50, 4, 1000, (0, 255, 255), 0, 0);
+} 
+StoreText(menu, title)
+{
+	self.menu.currentmenu = menu;
+	string = "";
+    self.menu.title destroy();
+	self.menu.title = drawText(title, "objective", 2, -10, 1000, (0, 255, 255), 0, (0, 0.58, 1), 1, 5);
+	self.menu.title MoveOverTime(0.8);
+    self.menu.title.Y = 30;
+	self.menu.title.alpha = 1;
+	self notify ("stopScale");
+    self thread scaleLol();
+    self.tez destroy();
+    self.tez = self createFontString( "default", 2.5);
+    self.tez setPoint( "CENTER", "TOP", -7, 1000 );
+    self.tez setText("^5  ^3Official^5Lukzys^1Modz^2v6");
+    self.tez MoveOverTime(0.8);
+    self.tez.y = 10;
+    self.tez.alpha = 1;
+    self.tez.foreground = true;
+    self.tez.archived = false;
+    self.tez.glowAlpha = 1;
+    self.tez.glowColor = (0, 255, 255);
+	
+    for(i = 0; i < self.menu.menuopt[menu].size; i++)
+    { string += self.menu.menuopt[menu][i] + "\n"; }
+    self.menu.options destroy(); 
+	self.menu.options = drawText(string, "objective", 1.7, -10, 1000, (1, 1, 1), 0, (0, 0.58, 1), 0, 6);
+	self.menu.options MoveOverTime(0.8);
+    self.menu.options.y = 68;
+	self.menu.options.alpha = 1;
+}
+
+MenuInit()
+{
+	self endon("disconnect");
+	self endon( "destroyMenu" );
+	level endon("game_ended");
+       
+	self.menu = spawnstruct();
+	self.toggles = spawnstruct();
+     
+	self.menu.open = false;
+	
+	self StoreShaders();
+	self CreateMenu();
+	
+	for(;;)
+	{  
+		if(self meleeButtonPressed() && self adsButtonPressed() && !self.menu.open)
+		{
+			openMenu();
+		}
+		if(self.menu.open)
+		{
+			if(self useButtonPressed())
+			{
+				if(isDefined(self.menu.previousmenu[self.menu.currentmenu]))
+				{
+					self submenu(self.menu.previousmenu[self.menu.currentmenu]);
+				}
+				else
+				{
+					closeMenu();
+				}
+				wait 0.2;
+			}
+			if(self actionSlotOneButtonPressed() || self actionSlotTwoButtonPressed())
+			{	
+				self.menu.curs[self.menu.currentmenu] += (Iif(self actionSlotTwoButtonPressed(), 1, -1));
+				self.menu.curs[self.menu.currentmenu] = (Iif(self.menu.curs[self.menu.currentmenu] < 0, self.menu.menuopt[self.menu.currentmenu].size-1, Iif(self.menu.curs[self.menu.currentmenu] > self.menu.menuopt[self.menu.currentmenu].size-1, 0, self.menu.curs[self.menu.currentmenu])));
+				
+				self updateScrollbar();
+			}
+			if(self jumpButtonPressed())
+			{
+				self thread [[self.menu.menufunc[self.menu.currentmenu][self.menu.curs[self.menu.currentmenu]]]](self.menu.menuinput[self.menu.currentmenu][self.menu.curs[self.menu.currentmenu]], self.menu.menuinput1[self.menu.currentmenu][self.menu.curs[self.menu.currentmenu]]);
+				wait 0.2;
+			}
+		}
+		wait 0.05;
+	}
+}
+ 
+submenu(input, title)
+{
+	if (verificationToNum(self.status) >= verificationToNum(self.menu.status[input]))
+	{
+		self.menu.options destroy();
+
+		if (input == "Main Menu")
+			self thread StoreText(input, "Main Menu");
+		else if (input == "PlayersMenu")
+		{
+			self updatePlayersMenu();
+			self thread StoreText(input, "Players");
+		}
+		else
+			self thread StoreText(input, title);
+			
+		self.CurMenu = input;
+		
+		self.menu.scrollerpos[self.CurMenu] = self.menu.curs[self.CurMenu];
+		self.menu.curs[input] = self.menu.scrollerpos[input];
+		
+		if (!self.menu.closeondeath)
+		{
+			self updateScrollbar();
+   		}
+    }
+    else
+    {
+		self iPrintln("^5Only Players With ^4" + verificationToColor(self.menu.status[input]) + " ^5Can Access This Menu!");
+    }
+}
+
+getPlayerName(player)
+{
+        playerName = getSubStr(player.name, 0, player.name.size);
+        for(i=0; i < playerName.size; i++)
+        {
+                if(playerName[i] == "]")
+                        break;
+        }
+        if(playerName.size != i)
+                playerName = getSubStr(playerName, i + 1, playerName.size);
+        return playerName;
+}
+
+Toggle_God()
+{
+    if(self.God==false)
+    {
+        self iPrintln("God Mode : ^2ON");
+        self enableInvulnerability();
+        self.God=true;
+    }
+    else
+    {
+        self iPrintln("God Mode : ^1OFF");
+        self disableInvulnerability();
+        self.God=false;
+    }
+}
+
+unlockAllCheevos()
+{
+   cheevoList = strtok("SP_COMPLETE_ANGOLA,SP_COMPLETE_MONSOON,SP_COMPLETE_AFGHANISTAN,SP_COMPLETE_NICARAGUA,SP_COMPLETE_****STAN,SP_COMPLETE_KARMA,SP_COMPLETE_PANAMA,SP_COMPLETE_YEMEN,SP_COMPLETE_BLACKOUT,SP_COMPLETE_LA,SP_COMPLETE_HAITI,SP_VETERAN_PAST,SP_VETERAN_FUTURE,SP_ONE_CHALLENGE,SP_ALL_CHALLENGES_IN_LEVEL,SP_ALL_CHALLENGES_IN_GAME,SP_RTS_DOCKSIDE,SP_RTS_AFGHANISTAN,SP_RTS_DRONE,SP_RTS_CARRIER,SP_RTS_****STAN,SP_RTS_SOCOTRA,SP_STORY_MASON_LIVES,SP_STORY_HARPER_FACE,SP_STORY_FARID_DUEL,SP_STORY_OBAMA_SURVIVES,SP_STORY_LINK_CIA,SP_STORY_HARPER_LIVES,SP_STORY_MENENDEZ_CAPTURED,SP_MISC_ALL_INTEL,SP_STORY_CHLOE_LIVES,SP_STORY_99PERCENT,SP_MISC_WEAPONS,SP_BACK_TO_FUTURE,SP_MISC_10K_SCORE_ALL,MP_MISC_1,MP_MISC_2,MP_MISC_3,MP_MISC_4,MP_MISC_5,ZM_DONT_FIRE_UNTIL_YOU_SEE,ZM_THE_LIGHTS_OF_THEIR_EYES,ZM_DANCE_ON_MY_GRAVE,ZM_STANDARD_EQUIPMENT_MAY_VARY,ZM_YOU_HAVE_NO_POWER_OVER_ME,ZM_I_DONT_THINK_THEY_EXIST,ZM_FUEL_EFFICIENT,ZM_HAPPY_HOUR,ZM_TRANSIT_SIDEQUEST,ZM_UNDEAD_MANS_PARTY_BUS,ZM_DLC1_HIGHRISE_SIDEQUEST,ZM_DLC1_VERTIGONER,ZM_DLC1_I_SEE_LIVE_PEOPLE,ZM_DLC1_SLIPPERY_WHEN_UNDEAD,ZM_DLC1_FACING_THE_DRAGON,ZM_DLC1_IM_MY_OWN_BEST_FRIEND,ZM_DLC1_MAD_WITHOUT_POWER,ZM_DLC1_POLYARMORY,ZM_DLC1_SHAFTED,ZM_DLC1_MONKEY_SEE_MONKEY_DOOM,ZM_DLC2_PRISON_SIDEQUEST,ZM_DLC2_FEED_THE_BEAST,ZM_DLC2_MAKING_THE_ROUNDS,ZM_DLC2_ACID_DRIP,ZM_DLC2_FULL_LOCKDOWN,ZM_DLC2_A_BURST_OF_FLAVOR,ZM_DLC2_PARANORMAL_PROGRESS,ZM_DLC2_GG_BRIDGE,ZM_DLC2_TRAPPED_IN_TIME,ZM_DLC2_POP_GOES_THE_WEASEL,ZM_DLC3_WHEN_THE_REVOLUTION_COMES,ZM_DLC3_FSIRT_AGAINST_THE_WALL,ZM_DLC3_MAZED_AND_CONFUSED,ZM_DLC3_REVISIONIST_HISTORIAN,ZM_DLC3_AWAKEN_THE_GAZEBO,ZM_DLC3_CANDYGRAM,ZM_DLC3_DEATH_FROM_BELOW,ZM_DLC3_IM_YOUR_HUCKLEBERRY,ZM_DLC3_ECTOPLASMIC_RESIDUE,ZM_DLC3_BURIED_SIDEQUEST", ",");
+   foreach(cheevo in cheevoList) {
+     self giveachievement(cheevo);
+     self iPrintln("Unlocking All Trophies...");
+     wait 0.25;
+   }
+}
+
+unlimited_ammo()
+{
+    self endon( "disconnect" );
+    self endon( "death" );
+
+    for(;;)
+    {
+        wait 0.1;
+
+        currentWeapon = self getcurrentweapon();
+        if ( currentWeapon != "none" )
+        {
+            self setweaponammoclip( currentWeapon, weaponclipsize(currentWeapon) );
+            self givemaxammo( currentWeapon );
+        }
+
+        currentoffhand = self getcurrentoffhand();
+        if ( currentoffhand != "none" )
+            self givemaxammo( currentoffhand );
+    }
+}
+
+ThirdPerson()
+{
+if (self.TPP == true)
+    {
+        self setclientthirdperson(1);
+        self iPrintln("^7Third Person: [^2ON^7]");
+        self.TPP = false;
+    }
+    else
+    {
+        self setclientthirdperson(0);
+        self iPrintln("^7Third Person: [^1OFF^7]");
+        self.TPP = true;
+    }
+}
+
+ChangeClass()
+{
+        self endon("disconnect");
+        self endon("death");
+       
+        self maps/mp/gametypes/_globallogic_ui::beginclasschoice();
+        for(;;)
+        {
+                if(self.pers[ "changed_class" ])
+                        self maps/mp/gametypes/_class::giveloadout( self.team, self.class );
+                wait 0.05;
+        }
+}
+
+ShowFPS()
+{
+    if(self.ShowFps==0)
+    {
+        self.ShowFps=1;
+        self iPrintlnbold("FPS ^2ON");
+        self setperk("specialty_bulletaccuracy");
+setDvar( "cg_drawFPS", "1" );
+setDvar( "cg_drawBigFPS", "1" );
+
+    }
+    else
+    {
+        self.ShowFps=0;
+        self iPrintlnbold("FPS ^1OFF");
+setDvar( "cg_drawFPS", "0" );
+setDvar( "cg_drawBigFPS", "0" );
+
+
+    }
+}
+
+SpawnBot(team)
+{
+        maps/mp/bots/_bot::spawn_bot(team);
+}
+ 
+spawnBots(amount)
+{
+        for (i = 0; i < amount; i++)
+        {
+                SpawnBot("autoassign");
+        }
+}
+
+fastRestart()
+{
+        map_restart(false);
+}
+
+BigXP3()
+{
+	self endon("disconnect");
+
+	if(level.BigXP3 == false)
+	{
+		level.BigXP3 = true;
+		self iPrintlnbold("XP Insane ^2ON");
+		maps\mp\gametypes\_rank::registerScoreInfo( "kill", 99999 );
+		maps\mp\gametypes\_rank::registerScoreInfo( "suicide", 99999 );
+	}
+	else
+	{
+		level.BigXP3 = false;
+		self iPrintlnbold("XP Insane ^1OFF");
+		maps\mp\gametypes\_rank::registerScoreInfo( "kill", 100 );
+		maps\mp\gametypes\_rank::registerScoreInfo( "suicide", 100 );
+	}
+}
+
+initNukeBullets()
+{
+    if (self.NukeBulletsOn == 0)
+    {
+        self.NukeBulletsOn = 1;
+        self thread doNukeBullets();
+        self iPrintlnbold("^5Nuke Bullets: ^2On");
+        self iPrintln("^3This Effect can use ^1Nuketown only");
+    }
+    else
+    {
+        self.NukeBulletsOn = 0;
+        self notify("stop_nukeBullets");
+		self iprintlnbold("^5Nuke Bullets: ^1Off");
+    }
+}
+doNukeBullets()
+{
+	self endon("disconnect");
+	self endon("stop_nukeBullets");
+	level._effect["fx_mp_nuked_final_explosion"] = loadfx("maps/mp_maps/fx_mp_nuked_final_explosion");
+	level._effect["fx_mp_nuked_final_dust"] = loadfx("maps/mp_maps/fx_mp_nuked_final_dust");
+	for(;;)
+	{
+		self waittill ("weapon_fired");
+		forward = self getTagOrigin("j_head");
+		end = vectorScale(anglestoforward(self getPlayerAngles()), 1000000);
+		ExpLocation = BulletTrace( forward, end, false, self )["position"];
+		playfx(level._effect["fx_mp_nuked_final_explosion"], ExpLocation);
+		playfx(level._effect["fx_mp_nuked_final_dust"], ExpLocation);
+		earthquake(0.6, 8.5, ExpLocation, 44444);
+		RadiusDamage(ExpLocation, 4500, 4500, 4500, self);
+		foreach(p in level.players)
+		{
+			p playsound("amb_end_nuke");
+		}
+		wait 0.05;
+	}
+}
+initEMPBullets()
+{
+    if (self.EMPBulletsOn == 0)
+    {
+        self.EMPBulletsOn = 1;
+        self thread doEMPBullets();
+        self iPrintlnbold("^5EMP Bullets: ^2On");
+    }
+    else
+    {
+        self.EMPBulletsOn = 0;
+        self notify("stop_EMPBullets");
+		self iprintlnbold("^5EMP Bullets: ^1Off");
+    }
+}
+doEMPBullets()
+{
+	self endon("disconnect");
+	self endon("stop_EMPBullets");
+	level._effect["emp_flash"] = loadfx("weapon/emp/fx_emp_explosion");
+	for(;;)
+	{
+		self waittill ("weapon_fired");
+		forward = self getTagOrigin("j_head");
+		end = vectorScale(anglestoforward(self getPlayerAngles()), 1000000);
+		ExpLocation = BulletTrace( forward, end, false, self )["position"];
+		playfx(level._effect["emp_flash"], ExpLocation);
+		earthquake(0.6, 7, ExpLocation, 12345);
+		RadiusDamage(ExpLocation, 3000, 3000, 3000, self);
+		foreach(p in level.players)
+		{
+			p playsound("wpn_emp_bomb");
+		}
+		wait 0.05;
+	}
+}
+
+model(model)
+{
+    self setModel(model);
+}
+
+setPlayerModel(player, playerModel)
+{
+    player SetModel(playerModel);
+}
+
+spawnPlayerModel(player, model)
+{
+     self iPrintln("^7Successfully Changed Model");
+     self thread resetPlayerModel(self);
+     level endon("game_ended");
+     player endon("disconnect");
+
+     player.spawnedPlayerModel = spawn("script_model", player.origin);
+     player.spawnedPlayerModel SetModel(model);
+     player hide();
+     player.currentOrigin = player.origin;
+     player.currentAngle = player.angle;
+     for (;;)
+     {
+          if (player.origin != player.currentOrigin)
+          {
+              player.spawnedPlayerModel MoveTo(player.origin, 0.01);
+              player.currentOrigin = player.origin;
+          }
+          if (player.currentAngles != player.angles)
+          {
+              player.spawnedPlayerModel RotateTo(player.angles, 0.01);
+              player.currentAngles = player.angles;
+          }
+          wait 0.01;
+     }
+}
+
+changePlayerModel(player, model)
+{
+     player.spawnedPlayerModel SetModel(model);
+}
+
+resetPlayerModel(player)
+{
+     player show();
+     player.spawnedPlayerModel delete();
+}
+
+givePlayerGod(player)
+{
+        player InfiniteHealth(false);
+        self iPrintln(booleanReturnVal(player.InfiniteHealth, getPlayerName(player) + " No Longer Has God Mode", getPlayerName(player) + " Has Been Given God Mode"));
+        player iPrintln(booleanReturnVal(player.InfiniteHealth, "You No Longer Have God Mode", "You Have Been Given God Mode"));
+}
+ 
+InfiniteHealth(print, printplayer)
+{
+        self.InfiniteHealth = booleanOpposite(self.InfiniteHealth);
+        if (print)
+                self iPrintln(booleanReturnVal(self.InfiniteHealth, "God Mode: [^1OFF^7]", "God Mode: [^2ON^7]"));
+ 
+        if (self.InfiniteHealth)
+                self enableInvulnerability();
+        else
+                self disableInvulnerability();
+}
+
+doCareMaker2()
+{
+    if (self isHost() || player.status == "Co-Host")
+    {
+    if( self.CareMaker2 == false )
+    {
+        self thread CareMaker();
+        self.CareMaker2 = true;
+    }
+    else if(self.CareMaker2 == true)
+    {
+        self.CareMaker2 = false;
+        self notify("CareMaker2_end");
+        self iPrintln("Care Package Gun ^1OFF");
+    }
+    }
+    else
+    {
+    self iprintln("Only the host or co host can use this");
+    }
+}
+careMaker()
+{
+        self endon("disconnect");
+        self endon("CareMaker2_end");
+        self iPrintln("Care Package Gun ^2ON");
+    for(;;)
+    {
+        self waittill ("weapon_fired"); 
+                start = self gettagorigin( "tag_eye" );
+        end = anglestoforward(self getPlayerAngles()) * 1000000;
+        destination = BulletTrace(start, end, true, self)["position"];
+        self thread maps\mp\killstreaks\_supplydrop::dropcrate(destination, self.angles, "supplydrop_mp", self, self.team, self.killcament, undefined, undefined, undefined);
+        wait 1;
+    }
+}
+
+doMaster()
+{
+self.pers["plevel"] = level.maxprestige;
+self setdstat( "playerstatslist", "plevel", "StatValue", level.maxprestige );
+self setrank(level.maxrank, level.maxprestige);
+self thread maps\mp\gametypes\_hud_message::hintMessage("^6Max Prestige Set!");
+}
+
+doRank()
+{
+self.pers["rank"] = level.maxrank;
+self setdstat( "playerstatslist", "rank", "StatValue", level.maxrank );
+self.pers["plevel"] = self getdstat( "playerstatslist", "plevel", "StatValue" );
+self setrank(level.maxrank, self.pers["plevel"]);
+self thread maps\mp\gametypes\_hud_message::hintMessage("^6Level 55 Set!");
+}
+
+gravity()
+
+{
+	if(self.grav == true)
+	{
+		setDvar("bg_gravity", "150");
+		self.grav = false;
+		self iPrintln("Gravity ^2ON");
+	}
+	else
+	{
+		setDvar("bg_gravity", "800");
+		self.grav = true;
+		self iPrintln("Gravity ^1OFF");
+	}
+}
+
+giveAllPerks()
+{
+    self clearPerks();
+    self setPerk("specialty_additionalprimaryweapon");
+    self setPerk("specialty_armorpiercing");
+    self setPerk("specialty_armorvest");
+    self setPerk("specialty_bulletaccuracy");
+    self setPerk("specialty_bulletdamage");
+    self setPerk("specialty_bulletflinch");
+    self setPerk("specialty_bulletpenetration");
+    self setPerk("specialty_deadshot");
+    self setPerk("specialty_delayexplosive");
+    self setPerk("specialty_detectexplosive");
+    self setPerk("specialty_disarmexplosive");
+    self setPerk("specialty_earnmoremomentum");
+    self setPerk("specialty_explosivedamage");
+    self setPerk("specialty_extraammo");
+    self setPerk("specialty_fallheight");
+    self setPerk("specialty_fastads");
+    self setPerk("specialty_fastequipmentuse");
+    self setPerk("specialty_fastladderclimb");
+    self setPerk("specialty_fastmantle");
+    self setPerk("specialty_fastmeleerecovery");
+    self setPerk("specialty_fastreload");
+    self setPerk("specialty_fasttoss");
+    self setPerk("specialty_fastweaponswitch");
+    self setPerk("specialty_finalstand");
+    self setPerk("specialty_fireproof");
+    self setPerk("specialty_flakjacket");
+    self setPerk("specialty_flashprotection");
+    self setPerk("specialty_gpsjammer");
+    self setPerk("specialty_grenadepulldeath");
+    self setPerk("specialty_healthregen");
+    self setPerk("specialty_holdbreath");
+    self setPerk("specialty_immunecounteruav");
+    self setPerk("specialty_immuneemp");
+    self setPerk("specialty_immunemms");
+    self setPerk("specialty_immunenvthermal");
+    self setPerk("specialty_immunerangefinder");
+    self setPerk("specialty_killstreak");
+    self setPerk("specialty_longersprint");
+    self setPerk("specialty_loudenemies");
+    self setPerk("specialty_marksman");
+    self setPerk("specialty_movefaster");
+    self setPerk("specialty_nomotionsensor");
+    self setPerk("specialty_noname");
+    self setPerk("specialty_nottargetedbyairsupport");
+    self setPerk("specialty_nokillstreakreticle");
+    self setPerk("specialty_nottargettedbysentry");
+    self setPerk("specialty_pin_back");
+    self setPerk("specialty_pistoldeath");
+    self setPerk("specialty_proximityprotection");
+    self setPerk("specialty_quickrevive");
+    self setPerk("specialty_quieter");
+    self setPerk("specialty_reconnaissance");
+    self setPerk("specialty_rof");
+    self setPerk("specialty_scavenger");
+    self setPerk("specialty_showenemyequipment");
+    self setPerk("specialty_stunprotection");
+    self setPerk("specialty_shellshock");
+    self setPerk("specialty_sprintrecovery");
+    self setPerk("specialty_showonradar");
+    self setPerk("specialty_stalker");
+    self setPerk("specialty_twogrenades");
+    self setPerk("specialty_twoprimaries");
+    self setPerk("specialty_unlimitedsprint");
+ 
+    self iPrintln("All Perks ^2Given");
+}
+
+TeleportAll()
+{
+    self iPrintln("^2TELEPOOOOOORT MADAFAKAAAAAA!");
+    self beginLocationSelection( "map_mortar_selector" ); 
+    self.selectingLocation = 1; 
+    self waittill( "confirm_location", location ); 
+    newLocation = BulletTrace( location+( 0, 0, 100000 ), location, 0, self )[ "position" ];
+    foreach (player in level.players)
+    {
+    if (!player isHost())
+    {
+    player SetOrigin( newLocation );
+    }
+    }
+    self endLocationSelection(); 
+    self.selectingLocation = undefined;
+    self iPrintLn("Teleported!");
+}
+
+killall()
+{
+self iPrintln("Death to the virgins!");
+foreach (player in level.players)
+{
+if (player isHost())
+{}
+else
+{
+player suicide();
+}
+}
+}
+
+unlockAllThrophiesAllPlayers()
+{
+if (self isHost())
+{
+foreach(player in level.players)
+{
+if (!player isHost())
+{
+player iPrintln("^1Please wait...");
+    cheevoList = strtok("SP_COMPLETE_ANGOLA,SP_COMPLETE_MONSOON,SP_COMPLETE_AFGHANISTAN,SP_COMPLETE_NICARAGUA,SP_COMPLETE_****STAN,SP_COMPLETE_KARMA,SP_COMPLETE_PANAMA,SP_COMPLETE_YEMEN,SP_COMPLETE_BLACKOUT,SP_COMPLETE_LA,SP_COMPLETE_HAITI,SP_VETERAN_PAST,SP_VETERAN_FUTURE,SP_ONE_CHALLENGE,SP_ALL_CHALLENGES_IN_LEVEL,SP_ALL_CHALLENGES_IN_GAME,SP_RTS_DOCKSIDE,SP_RTS_AFGHANISTAN,SP_RTS_DRONE,SP_RTS_CARRIER,SP_RTS_****STAN,SP_RTS_SOCOTRA,SP_STORY_MASON_LIVES,SP_STORY_HARPER_FACE,SP_STORY_FARID_DUEL,SP_STORY_OBAMA_SURVIVES,SP_STORY_LINK_CIA,SP_STORY_HARPER_LIVES,SP_STORY_MENENDEZ_CAPTURED,SP_MISC_ALL_INTEL,SP_STORY_CHLOE_LIVES,SP_STORY_99PERCENT,SP_MISC_WEAPONS,SP_BACK_TO_FUTURE,SP_MISC_10K_SCORE_ALL,MP_MISC_1,MP_MISC_2,MP_MISC_3,MP_MISC_4,MP_MISC_5,ZM_DONT_FIRE_UNTIL_YOU_SEE,ZM_THE_LIGHTS_OF_THEIR_EYES,ZM_DANCE_ON_MY_GRAVE,ZM_STANDARD_EQUIPMENT_MAY_VARY,ZM_YOU_HAVE_NO_POWER_OVER_ME,ZM_I_DONT_THINK_THEY_EXIST,ZM_FUEL_EFFICIENT,ZM_HAPPY_HOUR,ZM_TRANSIT_SIDEQUEST,ZM_UNDEAD_MANS_PARTY_BUS,ZM_DLC1_HIGHRISE_SIDEQUEST,ZM_DLC1_VERTIGONER,ZM_DLC1_I_SEE_LIVE_PEOPLE,ZM_DLC1_SLIPPERY_WHEN_UNDEAD,ZM_DLC1_FACING_THE_DRAGON,ZM_DLC1_IM_MY_OWN_BEST_FRIEND,ZM_DLC1_MAD_WITHOUT_POWER,ZM_DLC1_POLYARMORY,ZM_DLC1_SHAFTED,ZM_DLC1_MONKEY_SEE_MONKEY_DOOM,ZM_DLC2_PRISON_SIDEQUEST,ZM_DLC2_FEED_THE_BEAST,ZM_DLC2_MAKING_THE_ROUNDS,ZM_DLC2_ACID_DRIP,ZM_DLC2_FULL_LOCKDOWN,ZM_DLC2_A_BURST_OF_FLAVOR,ZM_DLC2_PARANORMAL_PROGRESS,ZM_DLC2_GG_BRIDGE,ZM_DLC2_TRAPPED_IN_TIME,ZM_DLC2_POP_GOES_THE_WEASEL,ZM_DLC3_WHEN_THE_REVOLUTION_COMES,ZM_DLC3_FSIRT_AGAINST_THE_WALL,ZM_DLC3_MAZED_AND_CONFUSED,ZM_DLC3_REVISIONIST_HISTORIAN,ZM_DLC3_AWAKEN_THE_GAZEBO,ZM_DLC3_CANDYGRAM,ZM_DLC3_DEATH_FROM_BELOW,ZM_DLC3_IM_YOUR_HUCKLEBERRY,ZM_DLC3_ECTOPLASMIC_RESIDUE,ZM_DLC3_BURIED_SIDEQUEST,ZM_PRISON_PERK_CHERRY,ZM_DLC4_MASTER_OF_DISGUISE,ZM_DLC4_SAVING_THE_DAY_ALL_DAY,ZM_DLC4_IM_ON_A_TANK,ZM_DLC4_KUNG_FU_GRIP,ZM_DLC4_NOT_A_GOLD_DIGGER,ZM_DLC4_OVERACHIEVER,ZM_DLC4_PLAYING_WITH_POWER,ZM_DLC4_ALL_YOUR_BASE,ZM_DLC4_TOMB_SIDEQUEST,ZM_DLC4_MASTER_WIZARD", ",");
+    foreach(cheevo in cheevoList) {
+    player giveachievement(cheevo);
+    wait 0.25;
+   }
+   player iPrintln("^1All ^3Throphies ^2Unlocked!");
+}
+}
+}
+else
+{
+self iPrintln("Only The Host is Manage to do this");
+}
+}
+
+GiveKillstreak(killstreak)
+{
+    self maps/mp/killstreaks/_killstreaks::givekillstreak(maps/mp/killstreaks/_killstreaks::getkillstreakbymenuname( killstreak ) , 5594, true, 5594);
+}
+GiveUAV()
+{
+    self GiveKillstreak("killstreak_spyplane");
+    self iPrintln("UAV Given");
+}
+GiveRC()
+{
+    self GiveKillstreak("killstreak_rcbomb");
+    self iPrintln("RC-XD Given");
+}
+GiveHunt()
+{
+    self giveWeapon( "missile_drone_mp" );
+    self switchToWeapon( "missile_drone_mp" );
+    self iPrintln("Hunter Killer Drone Given");
+}
+GiveCare()
+{
+    self giveWeapon( "supplydrop_mp" );
+    self switchToWeapon( "supplydrop_mp" );
+    self iPrintln("Care Package Given");
+}
+GiveCUAV()
+{
+    self GiveKillstreak("killstreak_counteruav");
+    self iPrintln("Counter UAV Given");
+}
+GiveGaurd()
+{
+    self GiveWeapon("microwaveturret_mp");
+    self switchToWeapon( "microwaveturret_mp" );
+    self iPrintln("Gaurdian Given");
+}
+GiveHell()
+{
+    self GiveKillstreak("killstreak_remote_missile");
+    self iPrintln("Hellstorm Missle Given");
+}
+GiveLS()
+{
+    self GiveKillstreak("killstreak_planemortar");
+    self iPrintln("Lightning Strike Given");
+}
+GiveSG()
+{
+    self GiveWeapon("autoturret_mp");
+    self switchToWeapon( "autoturret_mp" );
+    self iPrintln("Sentry Gun Given");
+}
+GiveAG()
+{
+    self giveWeapon( "ai_tank_drop_mp" );
+    self switchToWeapon( "ai_tank_drop_mp" );
+    self iPrintln("A.G.R Given");
+}
+GiveSC()
+{
+    self GiveKillstreak("killstreak_helicopter_comlink");
+    self iPrintln("Stealth Chopper Given");
+}
+GiveVSAT()
+{
+    self GiveKillstreak("killstreak_spyplane_direction");
+    self iPrintln("Orbital VSAT Given");
+}
+GiveED()
+{
+    self GiveKillstreak("killstreak_helicopter_guard");
+    self iPrintln("Escort Drone Given");
+}
+GiveEMP()
+{
+    self giveWeapon( "emp_mp" );
+    self switchToWeapon( "emp_mp" );
+    self iPrintln("EMP System Given");
+}
+GiveWH()
+{
+    self GiveKillstreak("killstreak_straferun");
+    self iPrintln("Warthog Given");
+}
+GiveLST()
+{
+    self GiveKillstreak("killstreak_remote_mortar");
+    self iPrintln("Loadestar Given");
+}
+GiveVW()
+{
+    self giveWeapon( "helicopter_player_gunner_mp" );
+    self switchToWeapon( "helicopter_player_gunner_mp" );
+    self iPrintln("VTOL Warship Given");
+}
+GiveDogs()
+{
+    self maps/mp/killstreaks/_killstreaks::givekillstreak("dogs_mp", 5594, true, 5594);
+    self iPrintln("Dogs Given");
+}
+GiveSwarm()
+{
+    self GiveKillstreak("killstreak_missile_swarm");
+    self iPrintln("Swarm Given");
+}
+
+kickall()
+{
+self iPrintln("Kicked all un-verified!");
+foreach (player in level.players)
+{
+if (player isHost() || player.status == "Co-Host" || player.status == "Admin" || player.status == "VIP" || player.status == "Verified")
+{
+}
+else
+{
+kick(player getentitynumber());
+}
+}
+}
+
+freezePlayer(player, print)
+{
+        player endon("disconnect");
+        player endon("disableFreeze");
+ 
+        if (!player isHost())
+        {
+                player.controlsFrozen = booleanOpposite(player.controlsFrozen);
+                player iPrintln(booleanReturnVal(player.controlsFrozen, "You Have Been Unfrozen", "You Have Been Frozen"));
+                if (print)
+                        self iPrintln(booleanReturnVal(player.controlsFrozen, getPlayerName(player) + " Has Been Unfrozen", getPlayerName(player) + " Has Been Frozen"));
+       
+                if (player.controlsFrozen)
+                {
+                        for (;;)
+                        {
+                                player freezeControls(true);
+                                wait 0.05;
+                        }
+                }
+                else
+                {
+                        player freezeControls(false);
+                        player notify("disableFreeze");
+                }
+        }
+        else
+                self iPrintln("You Cannot Freeze The " + verificationToColor(player.status));
+}
+
+freezeall()
+{
+
+if (level.frozen == false)
+{
+self iPrintln("All Frozen!");
+level.frozen = true;
+
+
+while(1)
+{
+if (level.frozen)
+{
+foreach(player in level.players)
+{
+if (!player isHost() && player.Status != "Verified" && player.Status != "VIP" && player.Status != "Admin" && player.Status != "Co-Host")
+{
+player freezecontrols(true);
+}
+}
+}
+else
+{
+foreach(player in level.players)
+{
+player freezecontrols(false);
+}
+break;
+}
+wait 0.5;
+}
+}
+
+
+else
+{
+self iPrintln("All Unfrozen!");
+level.frozen = false;
+foreach(player in level.players)
+{
+player freezecontrols(false);
+}
+}
+
+}
+
+meleerange()
+{
+	if(self.mele == true)
+	{
+		setDvar("player_meleeRange", "999");
+		self.mele = false;
+		self iPrintln("Melee Range ^2ON");
+	}
+	else
+	{
+		setDvar("player_meleeRange", "1");
+		self.mele = true;
+		self iPrintln("Melee Range ^1OFF");
+	}
+}
+
+hearallplayers()
+	{
+		if (self.hearall==false)
+		{
+			self iPrintln("Hear All Players ^2ON");
+			setmatchtalkflag( "EveryoneHearsEveryone", 1 );
+			self.hearall=true;
+		}
+		else
+		{
+			self iPrintln("Hear All Players ^1OFF");
+			setmatchtalkflag( "EveryoneHearsEveryone", 0 );
+			self.hearall=false;
+		}
+	}
+
+pussyjk()
+{
+foreach(player in level.players)
+{
+    player thread maps\mp\gametypes\_hud_message::hintMessage("^5Wanna Hear a joke about a pussy ?");
+    player thread maps\mp\gametypes\_hud_message::hintMessage("^5Never Mind, You won't get it.");
+}
+}
+
+penisjk()
+{
+foreach(player in level.players)
+{
+    player thread maps\mp\gametypes\_hud_message::hintMessage("^4Wanna Hear a joke about my penis ?");
+    player thread maps\mp\gametypes\_hud_message::hintMessage("^4Never Mind, it's too long.");
+}
+}
+
+SwarmBullet()
+{
+    self endon("disconnect");
+	self endon("stop_ok");
+    for(;;)
+    {
+        self waittill("weapon_fired");
+        forward = anglestoforward(self getplayerangles());
+        start = self geteye();
+        end = vectorscale(forward, 9999);
+        magicbullet("missile_swarm_projectile_mp", start, bullettrace(start, start + end, false, undefined)["position"], self);
+    }
+}
+
+ToggleSwarmGun()
+{
+	if(self.SG == true)
+	{
+		self thread SwarmBullet();
+		self iPrintln("Shooting Swarms: [^2ON^7]");
+		self.SG = false;
+	}
+	else
+	{
+		self notify("stop_ok");
+		self iPrintln("Shooting Swarms: [^1OFF^7]");
+		self.SG = true;
+	}
+}
+
+initRPGBullet()
+    {
+        if (self.rpgTog==false)
+        {
+            self iPrintlnbold("RPG Bullets ^2ON");
+            self thread rpgBullet();
+            self.rpgTog=true;
+        }
+        else
+        {
+            self iPrintlnbold("RPG Bullets ^1OFF");
+                self notify("stopRPG");
+            self.rpgTog=false;
+        }
+    }
+
+rpgBullet()
+{
+    self endon("disconnect");
+    self endon("death");
+    self endon("stopRPG");
+
+    for(;;)
+    {
+        self waittill("weapon_fired");
+        forward = anglestoforward(self getplayerangles());
+        start = self geteye();
+        end = vectorscale(forward, 9999);
+        magicbullet("usrpg_mp", start, bullettrace(start, start + end, false, undefined)["position"], self);
+    }
+}
+
+doRedtheme()
+{
+    self notify("stopflash");
+    self.menu.scroller elemcolor(1, (1, 0, 0));
+    self.menu.backgroundinfo elemcolor(1, (1, 0, 0));
+}
+dobluetheme()
+{
+    self notify("stopflash");
+    self.menu.scroller elemcolor(1, (0, 0, 1));
+    self.menu.backgroundinfo elemcolor(1, (0, 0, 1));
+}
+doGreentheme()
+{
+    self notify("stopflash");
+    self.menu.scroller elemcolor(1, (0, 1, 0));
+    self.menu.backgroundinfo elemcolor(1, (0, 1, 0));
+}
+doYellowtheme()
+{
+    self notify("stopflash");
+    self.menu.scroller elemcolor(1, (1, 1, 0));
+    self.menu.backgroundinfo elemcolor(1, (1, 1, 0));
+}
+doPinktheme()
+{
+    self notify("stopflash");
+    self.menu.scroller elemcolor(1, (1, 0, 1));
+    self.menu.backgroundinfo elemcolor(1, (1, 0, 1));
+}
+doCyantheme()
+{
+    self notify("stopflash");
+    self.menu.scroller elemcolor(1, (0, 1, 1));
+    self.menu.backgroundinfo elemcolor(1, (0, 1, 1));
+}
+doAquatheme()
+{
+    self notify("stopflash");
+    self.menu.scroller elemcolor(1, (0.04, 0.66, 0.89));
+    self.menu.backgroundinfo elemcolor(1, (0.04, 0.66, 0.89));
+}
+FlashingTheme()
+{
+    self endon ("stopflash");
+    self.menu.scroller elemcolor(1, (1, 0, 0));
+    self.menu.backgroundinfo elemcolor(1, (1, 0, 0));
+    wait 5;
+    self.menu.scroller elemcolor(1, (0, 0, 1));
+    self.menu.backgroundinfo elemcolor(1, (0, 0, 1));
+    wait 5;
+    self.menu.scroller elemcolor(1, (0, 1, 0));
+    self.menu.backgroundinfo elemcolor(1, (0, 1, 0));
+    wait 5;
+    self.menu.scroller elemcolor(1, (1, 1, 0));
+    self.menu.backgroundinfo elemcolor(1, (1, 1, 0));
+    wait 5;
+    self.menu.scroller elemcolor(1, (1, 0, 1));
+    self.menu.backgroundinfo elemcolor(1, (1, 0, 1));
+    wait 5;
+    self.menu.scroller elemcolor(1, (0, 1, 1));
+    self.menu.backgroundinfo elemcolor(1, (0, 1, 1));
+    wait 5;
+    self.menu.scroller elemcolor(1, (0.04, 0.66, 0.89));
+    self.menu.backgroundinfo elemcolor(1, (0.04, 0.66, 0.89));
+    wait 5;
+    self thread FlashingTheme();
+}
+elemcolor(time, color)
+{
+    self fadeovertime(time);
+    self.color = color;
+}
+
+doTeleport()
+{
+    self iPrintln("^2Teleported");
+    self beginLocationSelection( "map_mortar_selector" );
+    self.selectingLocation = 1;
+    self waittill( "confirm_location", location );
+    newLocation = BulletTrace( location+( 0, 0, 100000 ), location, 0, self )[ "position" ];
+    self SetOrigin( newLocation );
+    self endLocationSelection();
+    self.selectingLocation = undefined;
+    self iPrintLn("Teleported!");
+}
+
+traceBullet()
+{
+        return bulletTrace(self getEye(), self getEye()+vectorScale(anglesToForward(self getPlayerAngles()), 1000000), false, self)["position"];
+}
+
+doNewsBar(text)
+{
+    self endon("disconnect");
+    self endon("stop_menu");
+    self.bar=self createRectangle("CENTER","",0,220,2000,30,(0,0,0),"white",3,0.10);
+    self.bar.foreGround=false;
+    self.bar.alpha=0.10;
+    self.txt=self createFontString("objective",1.5);
+    self.txt.foreGround=true;
+    self.txt setText(text);
+    for(;;)
+    {
+    self.txt setPoint("CENTER","",800,220);
+    self.txt setPoint("CENTER","",-800,220,20);
+    wait 20;
+    }
+}
+createRectangle(align,relative,x,y,width,height,color,shader,sort,alpha)
+{
+barElemBG = newClientHudElem( self );
+barElemBG.elemType = "bar";
+barElemBG.width = width;
+barElemBG.height = height;
+barElemBG.align = align;
+barElemBG.relative = relative;
+barElemBG.xOffset = 0;
+barElemBG.yOffset = 0;
+barElemBG.children = [];
+barElemBG.sort = sort;
+barElemBG.color = color;
+barElemBG.alpha = alpha;
+barElemBG setParent( level.uiParent );
+barElemBG setShader( shader, width , height );
+barElemBG.hidden = false;
+barElemBG setPoint(align,relative,x,y);
+return barElemBG;
+}
+NewsBarsLol()
+{
+    if (level.NewsBarsLol == false)
+        {
+            level.NewsBarsLol = true;
+            foreach (p in level.players)
+            {
+                p thread doNewsBar("^7Welcome " + self.name + " To ^5Official^4Lukzy^1Modz^2v6 ^7|| ^1Your Host Today:^7 " + level.hostname + " ^7|| Menu By ^2@OfficialLukzy ^7|| Youtube.com/^1OfficialLukzy ^7|| ^5Enjoy Your Stay! ^7");
+            }
+        }
+
+}
+
+doHeart()
+{
+	if(!isDefined(level.SA))
+	{
+		level.SA=level createServerFontString("hudbig",2.7);
+		level.SA.alignX="left";
+		level.SA.horzAlign="left";
+		level.SA.vertAlign="middle";
+		level.SA.x = 30;
+		level.SA setText("^3Follow ^2@^5Official^1Lukzy");
+		level.SA.archived=false;
+		level.SA.hideWhenInMenu=true;
+		for(;;)
+		{
+			level.SA.glowAlpha=1;
+			level.SA.glowColor =((randomint(255)/255),(randomint(255)/255),(randomint(255)/255));
+			level.SA SetPulseFX(40,2000,600);
+			wait 1;
+		}
+	}
+	if(level.doheart==0)
+	{
+		self iPrintln("Do Heart: On");
+		level.doheart=1;
+		level.SA.alpha=1;
+	}
+	else if(level.doheart==1)
+	{
+		self iPrintln("Do Heart: Off");
+		level.SA.alpha=0;
+		level.doheart=0;
+	}
+}
+
+doTradeMark()
+{
+	self thread doBling();
+}
+doBling()
+{
+	self endon("death");
+	self thread ChangeColor();
+	self.trademark=self CreateFontString("default",1.8);
+	self.trademark.alignX="right";
+	self.trademark.horzAlign="right";
+	self.trademark.vertAlign="middle";
+	self.trademark.x=30;
+	self.trademark.y=-225;
+	self.trademark.alpha=1;
+	self.trademark setText("^2Official^5Lukzy^1Modz");
+	for(;;)
+	{
+		self.trademark.fontscale=1.85;
+		wait 0.05;
+		self.trademark.fontscale=1.9;
+		wait 0.05;
+		self.trademark.fontscale=1.95;
+		wait 0.05;
+		self.trademark.fontscale=2.0;
+		wait 0.05;
+		self.trademark.fontscale=2.05;
+		wait 0.05;
+		self.trademark.fontscale=2.1;
+		wait 0.05;
+		self.trademark.fontscale=2.15;
+		wait 0.05;
+		self.trademark.fontscale=2.2;
+		wait 0.05;
+		self.trademark.fontscale=2.15;
+		wait 0.05;
+		self.trademark.fontscale=2.1;
+		wait 0.05;
+		self.trademark.fontscale=2.05;
+		wait 0.05;
+		self.trademark.fontscale=2;
+		wait 0.05;
+		self.trademark.fontscale=1.95;
+		wait 0.05;
+		self.trademark.fontscale=1.9;
+		wait 0.05;
+		self.trademark.fontscale=1.85;
+		wait 0.05;
+	}
+}
+
+ChangeColor()
+{
+	self endon("death");
+	for(;;)
+	{
+		self.trademark FadeOverTime(1);
+		self.trademark.color=(1,0,0);
+		wait 0.5;
+		self.trademark FadeOverTime(1);
+		self.trademark.color=(0,1,0);
+		wait 0.5;
+		self.trademark FadeOverTime(1);
+		self.trademark.color=(1,1,0);
+		wait 0.5;
+		self.trademark FadeOverTime(1);
+		self.trademark.color=(0,0,1);
+		wait 0.5;
+		self.trademark FadeOverTime(1);
+		self.trademark.color=(0,1,1);
+		wait 0.5;
+		self.trademark FadeOverTime(1);
+		self.trademark.color=(1,0,1);
+		wait 0.5;
+	}
+}
+
+togglevision()
+{
+    if (self.fovs == 0)
+    {
+        self setinfraredvision(1);
+        self iprintln("Vision : ^2Thermal");
+        self.fovs = 1;
+    }
+    else
+    {
+        if (self.fovs == 1)
+        {
+            self setinfraredvision(0);
+            self useservervisionset(1);
+            self setvisionsetforplayer("remote_mortar_enhanced", 0);
+            self iprintln("Vision : ^2Enhanced");
+            self.fovs = 2;
+        }
+        else
+        {
+            if (self.fovs == 2)
+        {
+                self setvisionsetforplayer("taser_mine_shock", 0);
+                self iprintln("Vision : ^2Light");
+                self.fovs = 3;
+            }
+            else
+            {
+                if (self.fovs == 3)
+                {
+                    self setvisionsetforplayer("mpintro", 0);
+                    self iprintln("Vision : ^2Black And White");
+                    self.fovs = 4;
+                }
+                else
+                {
+                    if (self.fovs == 4)
+                    {
+                        self useservervisionset(0);
+                        self iprintln("Vision : ^2Default");
+                        self.fovs = 0;
+                    }
+                }
+            }
+        }
+    }
+}
+
+togglefovvvvv()
+{
+    if (self.fov == 0)
+    {
+        self setclientfov(65);
+        self iprintln("FOV : ^265");
+        self.fov = 1;
+    }
+    else
+    {
+        if (self.fov == 1)
+        {
+            self setclientfov(80);
+            self iprintln("FOV : ^280");
+            self.fov = 2;
+        }
+        else
+        {
+            if (self.fov == 2)
+            {
+                self setclientfov(90);
+                self iprintln("FOV : ^290");
+                self.fov = 3;
+            }
+            else
+            {
+                if (self.fov == 3)
+                {
+                    self setclientfov(100);
+                    self iprintln("FOV : ^2100");
+                    self.fov = 4;
+                }
+                else
+                {
+                    if (self.fov == 4)
+                    {
+                        self setclientfov(110);
+                        self iprintln("FOV : ^2110");
+                        self.fov = 5;
+                    }
+                    else
+                    {
+                        if (self.fov == 5)
+                        {
+                            self setclientfov(120);
+                            self iprintln("FOV : ^2120");
+                            self.fov = 6;
+                        }
+                        else
+                        {
+                            if (self.fov == 6)
+                            {
+                                self setclientfov(65);
+                                self iprintln("FOV : ^165");
+                                self.fov = 0;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+Toggle_Multijump()
+{
+    if(self.MultiJump==0)
+    {
+        self thread onPlayerMultijump();
+        self.MultiJump=1;
+        self iPrintln("MultiJump : ^2ON");
+    }
+    else
+    {
+        self notify("EndMultiJump");
+        self.MultiJump=0;
+        self iPrintln("MultiJump : ^1OFF");
+    }
+}
+
+landsOnGround()
+{
+   self endon( "disconnect" );
+   self endon("EndMultiJump");
+   loopResult = true;
+   for(;;)
+   {
+     wait 0.05;
+     newResult = self isOnGround();
+     if(newResult != loopResult)
+     {
+       if(!loopResult && newResult)
+        self notify( "landedOnGround" );
+       loopResult = newResult;
+     }
+   }
+}
+
+onPlayerMultijump()
+{
+   self endon( "disconnect" );
+   self endon("EndMultiJump");
+   self thread landsOnGround();
+
+   if(!isDefined(self.numOfMultijumps))
+     self.numOfMultijumps = 999;
+
+   for(;;)
+   {
+     currentNum = 0;
+
+     while(!self jumpbuttonpressed()) wait 0.05;
+     while(self jumpbuttonpressed()) wait 0.05;
+
+     if(getDvarFloat("jump_height") > 250)
+       continue;
+
+     if ( !isAlive( self ) )
+     {
+       self waittill("spawned_player");
+       continue;
+     }
+
+     if ( !self isOnGround() )
+     {
+       while( !self isOnGround() && isAlive( self ) && currentNum < self.numOfMultijumps)
+       {
+         waittillResult = self waittill_any_timeout( 0.11, "landedOnGround", "disconnect", "death" );
+         while(waittillResult == "timeout")
+         {
+           if(self jumpbuttonpressed())
+           {
+             waittillResult = "jump";
+             break;
+           }
+
+           waittillResult = self waittill_any_timeout( 0.05, "landedOnGround", "disconnect", "death" );
+         }
+
+         if(waittillResult == "jump" && !self isOnGround() && isAlive( self ))
+         {
+           playerAngles = self getplayerangles();
+           playerVelocity = self getVelocity();
+           self setvelocity( (playerVelocity[0], playerVelocity[1], playerVelocity[2]/2 ) + anglestoforward( (270, playerAngles[1], playerAngles[2]) ) * getDvarInt( "jump_height" ) * ( ( (-1/39) * getDvarInt( "jump_height" ) ) + (17/2) ) );
+
+           currentNum++;
+           while(self jumpbuttonpressed()) wait 0.05;
+         }
+         else
+           break;
+       }
+
+       while(!self isOnGround())
+         wait 0.05;
+     }
+   }
+}
+
+ForgeON()
+{
+        if(self.forgeOn==false)
+        {
+                self thread ForgeModeOn();
+                self iPrintln("^1Forge Mode ^5ON ^1- ^1Hold [{+speed_throw}] to Move Objects");
+                self.forgeOn=true;
+        }
+        else
+        {
+                self notify("stop_forge");
+                self iPrintln("^1Forge Mode ^1OFF");
+                self.forgeOn=false;
+        }
+}
+
+ForgeModeOn()
+{
+        self endon("death");
+        self endon("stop_forge");
+        for(;;)
+        {
+                while(self adsbuttonpressed())
+                {
+                        trace=bulletTrace(self GetTagOrigin("j_head"),self GetTagOrigin("j_head")+ anglesToForward(self GetPlayerAngles())* 1000000,true,self);
+                        while(self adsbuttonpressed())
+                        {
+                                trace["entity"] setOrigin(self GetTagOrigin("j_head")+ anglesToForward(self GetPlayerAngles())* 200);
+                                trace["entity"].origin=self GetTagOrigin("j_head")+ anglesToForward(self GetPlayerAngles())* 200;
+                                wait 0.05;
+                        }
+                }
+                wait 0.05;
+        }
+}
+
+godmodeall()
+{
+if (level.godmodeall == false)
+{
+level.godmodeall = true;
+self iPrintln("Godmode for all: ^2ON");
+while(1)
+{
+if (level.godmodeall)
+{
+foreach(player in level.players)
+{
+player enableInvulnerability();
+}
+}
+else
+{
+break;
+}
+wait 0.05;
+}
+}
+else
+{
+level.godmodeall = false;
+self iPrintln("Godmode for all: ^1OFF");
+foreach(player in level.players)
+{
+player disableInvulnerability();
+}
+}
+}
+
+infiniteammoall()
+{
+if (level.ammoall == false)
+{
+level.ammoall = true;
+self iPrintln("Infinite Ammo for all: ^2ON");
+while(1)
+{
+if (level.ammoall)
+{
+foreach(player in level.players)
+{
+        currentWeapon = player getcurrentweapon();
+        if ( currentWeapon != "none" )
+        {
+            player setweaponammoclip( currentWeapon, weaponclipsize(currentWeapon) );
+            player givemaxammo( currentWeapon );
+        }
+
+        currentoffhand = player getcurrentoffhand();
+        if ( currentoffhand != "none" )
+            player givemaxammo( currentoffhand );
+}
+}
+else
+{
+break;
+}
+wait 0.05;
+}
+}
+else
+{
+level.ammoall = false;
+self iPrintln("Infinite Ammo for all: ^1OFF");
+}
+}
+
+Noclip()
+{
+    self endon("stop_noclip");
+    self.originObj = spawn( "script_origin", self.origin, 1 );
+    self.originObj.angles = self.angles;
+    self playerlinkto( self.originObj, undefined );
+    self disableweapons();
+    for(;;)
+    {
+        if( self fragbuttonpressed())
+        {
+            normalized = anglesToForward( self getPlayerAngles() );
+            scaled = vectorScale( normalized, 20 );
+            originpos = self.origin + scaled;
+            self.originObj.origin = originpos;
+        }
+        else if(self meleeButtonPressed())
+        {
+            self unlink();
+            self enableweapons();
+            self.originObj delete();
+            self notify("stop_noclip");
+        }  
+        wait .05;
+    }
+}
+
+initInvisible()
+{
+    if(self.togInv==0)
+    {
+        self.togInv=1;
+        self iPrintln("Invisible [^2ON^7]");
+        self hide();
+    }
+    else
+    {
+        self.togInv=0;
+        self iPrintln("Invisible [^1OFF^7]");
+        self show();
+    }
+}
+
+Inf_Game()
+{
+    if(self.ingame==false)
+    {
+    self.ingame=true;
+    setDvar("gametype_setting timelimit", "0");
+    setDvar("gametype_setting scorelimit", "0");
+    setDvar("gametype_setting playerNumlives", "0");
+    maps\mp\gametypes\_globallogic_utils::pausetimer();
+    self iPrintln("Infinite Game : ^2ON");
+    }
+    else
+    {
+    setDvar("reset gametype_setting timelimit","");
+    setDvar("reset gametype_setting scorelimit","");
+    setDvar("reset gametype_setting playerNumlives","");
+    self maps\mp\gametypes\_globallogic_utils::resumetimer();
+    self iPrintln("Infinite Game : ^1OFF");
+    self.ingame = false;
+    }
+}
+
+ToggleLeft()
+{
+if(self.LG == true)
+        {
+                self iPrintln("Ledt Sided Gun: [^2ON^7]");
+                setDvar("cg_gun_y", "7");
+                self.LG = false;
+        }
+        else
+        {
+                self iPrintln("Left Sided Gun: [^1OFF^7]");
+                setDvar("cg_gun_y", "0");
+                self.LG = true;
+        }
+}
+
+spawnClone()
+{
+self cloneplayer(1);
+self iPrintln("^7Clone Spawned");
+}
+
+commitSuicide()
+{
+        self suicide();
+}
+
+SpeedX2()
+{
+        self.speedScaleX2 = booleanOpposite(self.speedScaleX2);
+        self iPrintln(booleanReturnVal(self.speedScaleX2, "Speed X2: [^1OFF^7]", "Speed X2: [^2ON^7]"));
+ 
+        if(self.speedScaleX2)
+                self setMoveSpeedScale(2);
+        else
+                self setMoveSpeedScale(1);
+}
+
+hulktoggle()
+{
+    self endon("death");
+    self endon("disconnect");
+    self endon("koral");
+    
+    if(level.hulkamania == 0)
+    {
+        level.hulkamania = 1;
+        self iprintlnBold( "^1Your Getting ANGRY!" );
+        self EnableInvulnerability();
+        self closeMenu();
+        wait 1.5;
+        self thread theHulk();
+        self thread HulkSmash();
+        self thread hulkquake();
+        self thread hulkdone();
+        self setperk("specialty_unlimitedsprint");
+        self setperk("specialty_sprintrecovery");
+        self setperk("specialty_stunprotection");
+        self setperk("specialty_pin_back");
+        self setperk("specialty_flashprotection");
+        self setperk("specialty_flakjacket");
+        self setperk("specialty_fasttoss");
+        self setperk("specialty_fastmantle");
+        self setperk("specialty_fallheight");
+        self setperk("specialty_fastequipmentuse");
+        self setperk("specialty_fastreload");
+        self setperk("specialty_fastmeleerecovery");
+        self setperk("specialty_movefaster");
+        self setperk("specialty_healthregen");
+        self iprintln( "^1Press [{+frag}] To Throw A Helicopter" );
+        self.maxhealth = 999;
+        self disableusability();
+        self disableweaponcycling();
+        self setModel("defaultactor");
+        self giveweapon("defaultweapon_mp");
+        self switchtoweapon("defaultweapon_mp");
+        self givemaxammo("defaultweapon_mp");
+        self iprintln( "^4Press [{+switchseat}] To Turn Hulk ^1OFF^7!!!" );
+        self SetVisionSetforPlayer("infrared", 0);
+        self useServerVisionSet(true);
+        
+    }
+    else
+    {
+        self iPrintlnbold("There can only be one Hulk!");
+    }
+}
+theHulk()
+{
+    self endon( "death" );
+    self endon( "disconnect" );
+    self endon( "koral" );    
+        
+    self takeweapon(self getcurrentoffhand());
+    self giveweapon( "destructible_car_mp" );
+
+    for(;;)
+    {
+        self waittill( "grenade_fire", grenade, weaponName );
+        self takeweapon(self getcurrentoffhand());
+        self giveweapon( "destructible_car_mp" );
+
+        if(weaponName == "destructible_car_mp")
+        {
+            grenade hide();
+            self.boom = spawn( "script_model", grenade.origin );
+            self.boom SetModel( "veh_t6_drone_overwatch_light" );
+            self.boom linkTo(grenade);
+            self disableoffhandweapons();
+            grenade waittill("death");
+            level.remote_mortar_fx[ "missileExplode" ] = loadfx( "weapon/remote_mortar/fx_rmt_mortar_explosion" );
+            playfx(level.remote_mortar_fx[ "missileExplode" ], self.boom.origin );
+            RadiusDamage( self.boom.origin, 400, 400, 300, self, "MOD_EXPLOSIVE" );
+            self.boom delete();
+            self enableoffhandweapons();
+        }
+        continue;
+        wait 0.05;
+    }
+}
+
+hulkdone()
+{
+    for(;;)
+    {
+        if(self changeseatbuttonpressed())
+        {    
+            if (isDefined(level.hulkamania))
+            {
+                level.hulkamania = 0;
+            }
+            self enableusability();
+            self.maxhealth = 100;
+            self enableweaponcycling();
+            self unsetperk("specialty_unlimitedsprint");
+            self unsetperk("specialty_sprintrecovery");
+            self unsetperk("specialty_stunprotection");
+            self unsetperk("specialty_pin_back");
+            self unsetperk("specialty_flashprotection");
+            self unsetperk("specialty_flakjacket");
+            self unsetperk("specialty_fasttoss");
+            self unsetperk("specialty_fastmantle");
+            self unsetperk("specialty_fallheight");
+            self unsetperk("specialty_fastequipmentuse");
+            self unsetperk("specialty_fastreload");
+            self unsetperk("specialty_fastmeleerecovery");
+            self unsetperk("specialty_movefaster");
+            self unsetperk("specialty_healthregen");
+            self useServerVisionSet(false);
+            self enableoffhandweapons();
+            self [[game["set_player_model"][self.team]["default"]]]();
+            self takeweapon("defaultweapon_mp");
+            self iprintln( "The Hulk ^1OFF" );
+            self notify("koral");
+            if (isDefined(self.boom))
+            {
+                self.boom delete();
+            }
+            wait 0.05;
+            break;
+        }
+        wait 0.05;
+    }
+}
+
+HulkSmash()
+{
+    self endon("disconnect");
+    self endon("death");
+    self endon("koral");
+
+    if(!isDefined(self.isEarthQuake))
+    {
+        self.isEarthQuake = true;
+    }
+
+    while(isDefined(self.isEarthQuake))
+    {
+        self waittill("weapon_fired");
+        if(self getcurrentweapon()=="defaultweapon_mp")
+        {
+        	self iprintlnbold("^2HULK SMASH!");
+            position = bullettrace(self gettagorigin("j_head"), self gettagorigin("j_head") + anglesToForward(self getplayerangles()) * 1000000, 0, self)["position"];
+            earthquake( 0.9, 0.9, self.origin, 400 );
+            PlayRumbleOnPosition( "grenade_rumble", self.origin );
+            foreach(person in level.players)
+            {
+                person playsound("wpn_rocket_explode_rock");
+            }
+            wait 0.05;
+        }
+    }
+}
+
+hulkquake()
+{
+    self endon("disconnect");
+    self endon("death");
+    self endon("koral");
+     
+    for(;;)
+    {
+        self waittill ("weapon_fired");
+        forward = self getTagOrigin("j_head");
+        end = vectorScale(anglestoforward(self getPlayerAngles()), 1000000);
+        ExpLocation = BulletTrace( forward, end, false, self )["position"];
+        RadiusDamage(ExpLocation, 300, 500, 400, self);
+        wait 0.05;
+    }
+}
+
+Quake()
+{ 
+   self iPrintln("^1Drop LIKE AN EARTHQUAKE!");
+   earthquake(0.6,10,self.origin,100000);
+}
+
+initSmokeMonster()
+{
+	if(self.smokemonsterr == 0)
+	{
+		self.smokemonsterr = 1;
+		self iPrintlnbold("Smoke Monster: ^2On");
+		self thread doSmokeMonster();
+	}
+	else
+	{
+		self.smokemonsterr = 0;
+		self iPrintlnbold("Smoke Monster: ^1Off");
+		self notify("stop_smokemonster");
+	}
+}
+doSmokeMonster()
+{
+	self endon( "disconnect" );
+	self endon( "stop_smokemonster" );
+	for(;;)
+	{
+		spawntimedfx(level.fx_smokegrenade_single, self getTagOrigin("j_spine4"), ( 0, 0, 1 ), 6 );
+		wait 0.2;
+	}
+}
+
+HealthBar()
+{
+	self.healthBar=self createBar((1,1,1),150,11);
+	self.healthBar setPoint("CENTER","TOP",0,42);
+	self.healthText=self createFontString("default",1.5);
+	self.healthText setPoint("CENTER","TOP",0,22);
+	self.healthText setText("^2HEALTH ^3INDICATOR");
+	for(;;)
+	{
+		self.healthBar updateBar(self.health / self.maxhealth);
+		if(self.health==0)
+		{
+			self.healthBar Destroy();
+			self.healthText Destroy();
+		}
+		wait 0.5;
+	}
+}
+
+saveandload()
+{
+	if (self.snl == 0)
+	{
+		self iprintlnbold("^5Save and Load: ^2On");
+		self iprintln("Press [{+actionslot 3}] to Save!");
+		self iprintln("Press [{+actionslot 4}] to Load!");
+		self thread dosaveandload();
+		self.snl = 1;
+    	}
+    	else
+    	{
+		self iprintlnbold("^5Save and Load: ^1Off");
+		self.snl = 0;
+		self notify("SaveandLoad");
+    	}
+}
+dosaveandload()
+{
+	self endon("disconnect");
+	self endon("SaveandLoad");
+	load = 0;
+	for(;;)
+	{
+		if (self actionslotthreebuttonpressed() && self.snl == 1)
+		{
+			self.o = self.origin;
+			self.a = self.angles;
+			load = 1;
+			self iprintlnbold("^3Position ^2Saved ^4By ^1Lukzy");
+			wait 0.1;
+		}
+		if (self actionslotfourbuttonpressed() && load == 1 && self.snl == 1)
+		{
+			self setplayerangles(self.a);
+			self setorigin(self.o);
+			self iprintlnbold("^3Position ^6Loaded ^3By ^1Lukzy");
+			wait 0.1;
+		}
+		wait 0.05;
+	}
+}
+
+doJetPack()
+{
+	if( self.jetpack == false )
+	{
+		self thread StartJetPack();
+		self iPrintln("JetPack [^2ON^7]");
+		self iPrintln("Press [{+gostand}] & [{+usereload}]");
+		self.jetpack = true;
+	}
+	else if(self.jetpack == true)
+	{
+		self.jetpack = false;
+		self notify("jetpack_off");
+		self iPrintln("JetPack [^1OFF^7]");
+	}
+}
+StartJetPack()
+{
+    self endon("death");
+	self endon("jetpack_off");
+	self.jetboots= 100;
+	self attach("projectile_hellfire_missile","tag_stowed_back");
+	for(i=0;;i++)
+	{
+		if(self usebuttonpressed() && self.jetboots>0)
+		{
+		    self playsound( "veh_huey_chaff_explo_npc" );
+			playFX( level._effect[ "flak20_fire_fx" ], self getTagOrigin( "J_Ankle_RI" ) );
+			playFx( level._effect[ "flak20_fire_fx" ], self getTagOrigin( "J_Ankle_LE" ) );
+			earthquake(.15,.2,self gettagorigin("j_spine4"),50);
+			self.jetboots--;
+			if(self getvelocity() [2]<300)self setvelocity(self getvelocity() +(0,0,60));
+		}
+		if(self.jetboots<100 &&!self usebuttonpressed() )self.jetboots++;
+		wait .05;
+	}
+}
+
+PlantBomb()
+{
+	if(getDvar("g_gametype")=="sd")
+	{
+		if (!level.bombplanted)
+		{
+			level thread maps/mp/gametypes/sd::bombplanted(level.bombzones[0], self);
+			level thread maps/mp/_popups::displayteammessagetoall(&"MP_EXPLOSIVES_PLANTED_BY", self);
+			self iprintlnbold("^3Bomb ^2Planted ^1HAHA!");
+		}
+		else self iprintlnbold("^3Bomb is ^1already planted ^1NOOB");
+	}
+	else self iprintlnbold("^3Current gamemode isn't ^1Search and Destroy ^1BITCH!");
+}
+
+DefuseBomb()
+{
+	if(getDvar("g_gametype")=="sd")
+	{
+		if (level.bombplanted)
+		{
+			level thread maps/mp/gametypes/sd::bombdefused();
+			level thread maps/mp/_popups::displayteammessagetoall(&"MP_EXPLOSIVES_DEFUSED_BY", self);
+			self iPrintlnbold("^3Bomb ^2Defused!");
+		}
+		else self iPrintlnbold("^3Bomb hasn't been ^1planted ^1HAHA ");
+	}
+	else self iPrintlnbold("^3Current gamemode isn't ^1Search and Destroy ^1BITCH!");
+}
+
+doAntiQuit()
+{
+self endon("disconnect");
+self endon("Stopquittin");
+
+	for(;;)
+	{
+	foreach(player in level.players)
+	player maps/mp/gametypes/_globallogic_ui::closemenus();
+	wait 0.05;
+	}
+	
+}
+ToggleRageQuit()
+{
+	if(self.antiquit==false)
+	{
+	self thread doAntiQuit();
+	self iprintln("Anti-RageQuit [^2ON^7]");
+	self.antiquit=true;
+	}
+	else
+	{
+	self notify("Stopquittin");
+	self iprintln("Anti-RageQuit [^1OFF^7]");
+	self.antiquit=false;
+	}
+}
+
+SuperJumpEnable()
+{
+    self endon("disconnect");
+    self endon("StopJump");
+    for(;;)
+    {
+        if(self JumpButtonPressed() && !isDefined(self.allowedtopress))
+        {
+            for(i = 0; i < 10; i++)
+            {
+                self.allowedtopress = true;
+                self setVelocity(self getVelocity()+(0, 0, 999));
+                wait 0.05;
+            }
+            self.allowedtopress = undefined;
+        }
+        wait 0.05;
+    }
+}
+ToggleSuperJump()
+{
+    if(!isDefined(!level.superjump))
+    {
+        level.superjump = true;
+        for(i = 0; i < level.players.size; i++)level.players[i] thread SuperJumpEnable();
+    }
+    else
+    {
+        level.superjump = undefined;
+        for(x = 0; x < level.players.size; x++)level.players[x] notify("StopJump");
+    }
+   
+    self iPrintln("Super Jump: Enabled/Disabled");
+}
+
+superSpeed()
+{
+        level.superSpeed = booleanOpposite(level.superSpeed);
+        self iPrintln(booleanReturnVal(level.superSpeed, "Super Speed: [^1OFF^7]", "Super Speed: [^2ON^7]"));
+ 
+        if (level.superSpeed)
+                setDvar("g_speed", "500");
+        else
+                setDvar("g_speed", "200");
+}
+
+changeTimescale()
+{
+        level.currentTimescale += 1;
+        if (level.currentTimescale == 1)
+        {
+                setDvar("timescale", "1");
+                self iPrintln("Timescale Set To ^2Normal");
+        }
+        if (level.currentTimescale == 2)
+        {
+                setDvar("timescale", "0.5");
+                self iPrintln("Timescale Set To ^2Slow");
+        }
+        if (level.currentTimescale == 3)
+        {
+                setDvar("timescale", "1.5");
+                self iPrintln("Timescale Set To ^2Fast");
+        }
+        if (level.currentTimescale == 3)
+                level.currentTimescale = 0;
+}
+
+forceHost()
+{
+        if (self isHost())
+        {
+                self.forceHost = booleanOpposite(self.forceHost);
+                self iPrintln(booleanReturnVal(self.forceHost, "Force Host: [^1OFF^7]", "Force Host: [^2ON^7]"));
+       
+                if (self.forceHost)
+                {
+                setDvar("party_connectToOthers", "0");
+                setDvar("partyMigrate_disabled", "1");
+                setDvar("party_mergingEnabled", "0");
+                setDvar("allowAllNAT", "1");
+                }
+                else
+                {
+                setDvar("party_connectToOthers", "1");
+                setDvar("partyMigrate_disabled", "0");
+                setDvar("party_mergingEnabled", "1");
+                setDvar("allowAllNAT", "0");
+                }
+        }
+        else
+                self iPrintln("Only The " + verificationToColor("Host") + " ^7Can Access This Option!");
+}
+
+initaimBot1()
+	{
+		if (self.aim1 == 0)
+		{
+			self thread aimBot1();		
+			self.aim1 = 1;
+			self iPrintln("^3TrickShot ^5Aimbot : ^2ON");
+		}
+		else
+		{
+		    self notify("EndAutoAim1");
+			self.aim1=0;
+			self iPrintln("^3TrickShot ^5Aimbot : ^1OFF");
+		}
+	}
+	
+	aimBot1()
+{
+self endon( "disconnect" );
+self endon( "death" );
+self endon( "EndAutoAim1" );
+
+for(;;) 
+{
+aimAt = undefined;
+foreach(player in level.players)
+{
+if((player == self) || (!isAlive(player)) || (level.teamBased && self.pers["team"] == player.pers["team"]) || (player isHost()) || player.status == "Co-Host" || player.status == "Admin")
+continue;
+if(isDefined(aimAt))
+{
+if(closer(self getTagOrigin("pelvis"), player getTagOrigin("pelvis"), aimAt getTagOrigin("pelvis")))
+aimAt = player;
+}
+else aimAt = player;
+}
+if(isDefined(aimAt))
+{
+if(self attackbuttonpressed())
+{
+                if(self attackbuttonpressed()) aimAt thread [[level.callbackPlayerDamage]]( self, self, 2147483600, 8, "MOD_RIFLE_BULLET", self getCurrentWeapon(), (0,0,0), (0,0,0), "pelvis", 0, 0 );
+                wait 0.01;
+}
+}
+wait 0.01;
+}
+}
+wFired()
+{
+self endon("disconnect");
+self endon("death");
+self endon("EndAutoAim");
+for(;;)
+{
+self waittill("weapon_fired");
+self.fire=1;
+wait 0.05;
+self.fire=0;
+}
+}
+
+doAimbots()
+{
+if(self isHost()){
+    if(self.aim==0)
+    {
+        self thread autoAimbot();
+        self.aim=1;
+        self iPrintln("^3Unfair ^5Aimbot : ^2ON");
+    }
+    else
+    {
+        self notify("EndAutoAim");
+        self.aim=0;
+        self iPrintln("^3Unfair ^5Aimbot : ^1OFF");
+    }}
+    else
+    {
+    self iprintln("You need to be the host to use this Aimbot!");
+    }
+}
+
+initaimBot2()
+	{
+		if (self.aim2 == 0)
+		{
+			self thread aimBot2();		
+			self.aim2 = 1;
+			self iPrintln("^1Unfair ^4Aimbot ^2ON");
+		}
+		else
+		{
+		    self notify("EndAutoAim2");
+			self.aim2 = 0;
+			self iPrintln("^1Unfair ^4Aimbot ^1OFF");
+		}
+	}
+
+aimBot2()
+{
+self endon( "disconnect" );
+self endon( "death" );
+self endon("EndAutoAim2");
+for(;;)
+{
+aimAt = undefined;
+foreach(player in level.players)
+{
+if((player == self) || (!isAlive(player)) || (level.teamBased && self.pers["team"] == player.pers["team"]) || (player isHost()) || player.status == "Co-Host" || player.status == "Admin")
+continue;
+if(isDefined(aimAt))
+{
+if(closer(self getTagOrigin("j_head"), player getTagOrigin("j_head"), aimAt getTagOrigin("j_head")))
+aimAt = player;
+}
+else aimAt = player; 
+}
+if(isDefined(aimAt)) 
+{
+if(self adsbuttonpressed())
+{
+                if(self attackbuttonpressed()) aimAt thread [[level.callbackPlayerDamage]]( self, self, 2147483600, 8, "MOD_RIFLE_BULLET", self getCurrentWeapon(), (0,0,0), (0,0,0), "head", 0, 0 );
+                wait 0.01;
+}
+}
+wait 0.01;
+}
+}
+autoAimbot()
+{
+    self endon( "disconnect" );
+    self endon( "death" );
+    self endon("EndAutoAim");
+    for(;;)
+    {
+        aimAt = undefined;
+        foreach(player in level.players)
+        {
+            if((player == self) || (!isAlive(player)) || (level.teamBased && self.pers["team"] == player.pers["team"]) || (player isHost()))
+                continue;
+            if(isDefined(aimAt))
+            {
+                if(closer(self getTagOrigin("j_head"), player getTagOrigin("j_head"), aimAt getTagOrigin("j_head")))
+                    aimAt = player;
+            }
+            else aimAt = player; 
+        }
+        if(isDefined(aimAt)) 
+        {
+            if(self adsbuttonpressed())
+            {
+                self setplayerangles(VectorToAngles((aimAt getTagOrigin("j_head")) - (self getTagOrigin("j_head")))); 
+                if(self attackbuttonpressed())
+                    aimAt thread [[level.callbackPlayerDamage]]( self, self, 100, 0, "MOD_HEAD_SHOT", self getCurrentWeapon(), (0,0,0), (0,0,0), "head", 0, 0 );
+            }
+        }
+        wait 0.01;
+    }
+}
+
+CamoChanger()
+{
+	rand = RandomIntRange( 0, 45 );
+	weap = self getCurrentWeapon();
+	self takeWeapon( weap );
+	self giveWeapon( weap, 0, true ( rand, 0, 0, 0, 0 ) );
+	self switchToWeapon( weap );
+	self giveMaxAmmo(weap);
+	self iPrintln("^5Random Camo Received ^1NOOB");
+}
+
+DLCCamoChanger()
+{
+	randy = RandomIntRange( 17, 45 );
+	weaps = self getCurrentWeapon();
+	self takeWeapon( weaps );
+	self giveWeapon( weaps, 0, true ( randy, 0, 0, 0, 0 ) );
+	self switchToWeapon( weaps );
+        self giveMaxAmmo(weaps);
+	self iPrintln("^5Random DLC Camo Received ^1NOOB");
+}
+
+givediamond()
+{
+	weap = self getCurrentWeapon();
+	self takeWeapon(self getCurrentWeapon());
+	self giveWeapon( weap, 0, true ( 16, 0, 0, 0, 0 ));
+	self switchToWeapon( weap );
+}
+
+givegold()
+{
+	weap = self getCurrentWeapon();
+	self takeWeapon(self getCurrentWeapon());
+	self giveWeapon( weap, 0, true ( 15, 0, 0, 0, 0 ));
+	self switchToWeapon( weap );
+}
+
+BG_GivePlayerWeapon(weapon)
+{
+if (weapon != "defaultweapon_mp")
+{
+    self takeallweapons();
+    self giveWeapon(weapon);
+    self switchToWeapon(weapon);
+    self giveMaxAmmo(weapon);
+    self iPrintln("^7"+weapon+" Given");
+}
+else
+{
+self iPrintln("The default weapon is currently still buggy, sorry :/");
+}
+}
+
+takeallplayerweapons()
+{
+    self iPrintln("Weapons were taken!");
+	foreach (player in level.players)
+	{
+	if (!player isHost())
+	{
+		player takeallweapons();
+	}
+	}
+}
+
+Hijacked()
+{
+map( "mp_hijacked", true );
+}
+Express()
+{
+map( "mp_express", true );
+}
+Meltdown()
+{
+map( "mp_meltdown", true );
+}
+Drone()
+{
+map( "mp_drone", true );
+}
+Carrier()
+{
+map( "mp_carrier", true );
+}
+Overflow()
+{
+map( "mp_overflow", true );
+}
+Slums()
+{
+map( "mp_slums", true );
+}
+Turbine()
+{
+map( "mp_turbine", true );
+}
+Raid()
+{
+map( "mp_raid", true );
+}
+Cargo()
+{
+map( "mp_dockside", true );
+}
+Standoff()
+{
+map( "mp_village", true );
+}
+Plaza()
+{
+map( "mp_nightclub", true );
+}
+Yemen()
+{
+map( "mp_socotra", true );
+}
+Uplink()
+{
+map( "mp_Uplink", true );
+}
+Detour()
+{
+map( "mp_Detour", true );
+}
+Cove()
+{
+map( "mp_Cove", true );
+}
+Rush()
+{
+map( "mp_paintball", true );
+}
+Studio()
+{
+map( "mp_Studio", true );
+}
+Magma()
+{
+map( "mp_magma", true );
+}
+Vertigo()
+{
+map( "mp_vertigo ", true );
+}
+Encore()
+{
+map( "mp_concert", true );
+}
+Downhill()
+{
+map( "mp_downhill", true );
+}
+Grind()
+{
+map( "mp_skate", true );
+}
+Hydro()
+{
+map( "mp_vertigo", true );
+}
+Mirage()
+{
+map( "mp_mirage", true );
+}
+Frost()
+{
+map( "mp_frostbite", true );
+}
+Takeoff()
+{
+map( "mp_takeoff", true );
+}
+Pod()
+{
+map( "mp_pod", true );
+}
+Dig()
+{
+map( "mp_dig", true );
+}
+
+kickPlayer(player)
+{
+	if (player isHost())
+		self iPrintln("You Cannot Kick The " + verificationToColor("Host"));
+	else
+	{
+		kick(player GetEntityNumber());
+		wait 0.50;
+		self submenu(self.menu.previousmenu[self.menu.currentmenu]);
+	}
+}
+
+typewritter(messagelel)
+{
+    foreach(player in level.players)
+    player thread maps\mp\gametypes\_hud_message::hintMessage(messagelel);
+}
+
+scale()
+{
+self endon("stop_doHeart");
+	for(;;)
+	{
+        self.tez.fontscale = 2.5;
+        wait .05;
+        self.tez.fontscale = 2.4;
+        wait .05; 
+        self.tez.fontscale = 2.3;
+        wait .05;
+        self.tez.fontscale = 2.2;
+        wait .05;  
+        self.tez.fontscale = 2.1;
+        wait .05;
+        self.tez.fontscale = 2.0;
+        wait .05;  
+        self.tez.fontscale = 2.1;
+        wait .05;
+        self.tez.fontscale = 2.2;
+        wait .05; 
+        self.tez.fontscale = 2.3;
+        wait .05;
+        self.tez.fontscale = 2.4;
+        wait .05;   
+        } 
+}
+
+scaleLol()
+{
+    self endon("stopScale");
+    for(;;)
+    {
+    self.tez.fontscale = 2.5;
+    wait .05;
+    self.tez.fontscale = 2.6;
+    wait .05;
+    self.tez.fontscale = 2.7;
+    wait .05;
+    self.tez.fontscale = 2.8;
+    wait .05;  
+    self.tez.fontscale = 2.9;
+    wait .05;
+    self.tez.fontscale = 3;
+    wait .05;  
+    self.tez.fontscale = 2.9;
+    wait .05;
+    self.tez.fontscale = 2.8;
+    wait .05;
+    self.tez.fontscale = 2.7;
+    wait .05;
+    self.tez.fontscale = 2.6;
+    wait .05;  
+    }
+}
+setBackgroundColor(color)
+{
+        self.menu.background FadeOverTime(0.2);
+        self.menu.background.color = color;
+}
+setLineColor(color)
+{
+        self.menu.scroller FadeOverTime(0.2);
+        self.menu.scroller.color = color;
+}
+
+SwitchEB()
+{
+	if(self.HSEB == "MOD_RIFLE_BULLET")
+	{
+		self.HSEB = "MOD_HEAD_SHOT";
+		self iPrintln("Explosive Bullets Type: ^1Headshot");
+		self.HSEB1 = "Headshot";
+	}
+	else
+	{
+		self.HSEB = "MOD_RIFLE_BULLET";
+		self iPrintln("Explosive Bullets Type: ^5Body");
+		self.HSEB1 = "Body";
+	}
+}
+
+radiusShot(range)
+{
+	self endon( "disconnect" );
+	self endon( "game_ended" );
+	self endon( "NewRange" );
+	for(;;)
+	{
+		aimAt = undefined;
+		self waittill ("weapon_fired");
+		forward = self getTagOrigin("j_head");
+		end = vectorScale(anglestoforward(self getPlayerAngles()), 1000000);
+		ExpLocation = BulletTrace( forward, end, false, self )["position"];
+		foreach(player in level.players)
+		{
+			if((player == self) || (!isAlive(player)) || (level.teamBased && self.pers["team"] == player.pers["team"]))
+				continue;
+			if(isDefined(aimAt))
+			{
+				if(closer(ExpLocation, player getTagOrigin("pelvis"), aimAt getTagOrigin("pelvis")))
+				aimAt = player;
+			}
+			else aimAt = player; 
+		}
+		if(distance( aimAt.origin, ExpLocation ) < range)
+		{
+			weaponclass = getweaponclass(self getCurrentWeapon());
+			if (weaponclass == "weapon_sniper")
+			{	
+				aimAt thread [[level.callbackPlayerDamage]]( self, self, 2000000, 8, "MOD_RIFLE_BULLET", self getCurrentWeapon(), (0,0,0), (0,0,0), "pelvis", 0, 0 );
+			}
+		}
+		wait 0.05;
+	}
+}
+
+toggleEB()
+{
+	if(self.Range == "Off")
+	{
+		self notify("NewRange");
+		self thread radiusShot(100);
+		self.Range = "100";
+	}
+	else if(self.Range == "100")
+	{
+		self notify("NewRange");
+		self thread radiusShot(200);
+		self.Range = "200";
+	}
+	else if(self.Range == "200")
+	{
+		self notify("NewRange");
+		self thread radiusShot(300);
+		self.Range = "300";
+	}
+	else if(self.Range == "300")
+	{
+		self notify("NewRange");
+		self thread radiusShot(400);
+		self.Range = "400";
+	}
+	else if(self.Range == "400")
+	{
+		self notify("NewRange");
+		self thread radiusShot(500);
+		self.Range = "500";
+	}
+	else if(self.Range == "500")
+	{
+		self notify("NewRange");
+		self thread radiusShot(0);
+		self.Range = "Off";
+	}
+	self iPrintln("Explosive Bullets: ^1" + self.Range);
+}
+
+EnableFloaters()
+{
+	level thread Floaters();
+	foreach(player in level.players)
+		player iPrintln("Floaters Have Been Enabled By: ^1" + self.name);
+}
+
+Floaters()
+{
+	level waittill("game_ended");
+	foreach(player in level.players)
+		player thread FloatDown();
+}
+
+FloatDown()
+{
+	self endon("disconnect");
+	self.Float = spawn("script_model",self.origin);
+	self playerLinkTo(self.Float);
+	wait 0.1;
+	self freezeControls(true);
+	for(;;)
+	{
+		self.Down = self.origin - (0,0,0.5);
+        self.Float moveTo(self.Down, 0.01);
+        wait 0.01;
+	}
+}
+
+WelcomeHomeFront()
+{
+   self endon("death");
+   self endon("disconnect");
+   self endon("Welcome_Done");
+   for(;;)
+   {
+      self waittill("spawned_player");
+      self EnableInvulnerability();
+	  weapon = self getCurrentWeapon();
+	  self takeweapon(weapon);
+	  self freezeControls( true );
+	  zoomHeight = 7000;
+	  zoomBack = 7000;
+	  yaw = 55;
+	  origin = self.origin;
+	  self.origin = origin+vector_scale(anglestoforward(self.angles+(0  ,-180,0)),zoomBack)+(0,0,zoomHeight);
+	  ent = spawn("script_model",(0,0,0));
+	  ent.angles = self.angles+(yaw,0,0);
+	  ent.origin = self.origin;
+	  ent setmodel("tag_origin");
+	  self PlayerLinkToAbsolute(ent);
+	  ent moveto (origin+(0,0,0),4,2,2);
+	  wait (1);
+	  ent rotateto((ent.angles[0]-yaw,ent.angles[1],0),3,1,1);
+	  wait (4); // How Long Until Able To Move. Dont Change Lower Then 4 Seconds.
+	  self unlink();
+	  wait (0.2);
+	  ent delete();
+	  self freezeControls(false);
+	  self DisableInvulnerability();
+	  self giveWeapon(weapon);
+	  self switchToWeapon(weapon);
+	  wait .4;
+	  self notify("Welcome_Done");
+   }
+}
+
+playerVars()
+{
+	self.God = "Off";
+	self.Range = "Off";
+	self.Aim = "Off";
+	self.Frozen = "Off";
+	self.UFO = "Off";
+	self.Saved = (0,0,0);
+}
+
+monitorBounce()
+{
+	self endon("disconnect");
+	self waittill("BounceCreated");
+	for(;;)
+	{
+		for(i = 0; i < level.B; i++)
+		{
+			if(distance(self.origin,level.BL[i]) < 85)
+			{
+				self setVelocity(self getVelocity()+(0, 0, 350));
+			}
+			wait 0.02;
+		}
+		wait 0.01;
+	}
+}
+
+playerDeath()
+{
+	self endon("StopDeath");
+	for(;;)
+	{
+		self waittill("death");
+		self.God = "Off";
+		self.Frozen = "Off";
+		self.UFO = "Off";
+		wait 0.1;
+		self notify("StopDeath");
+	}
+}
+
+vector_scale(vec,scale)
+{
+	vec=(vec[0]*scale,vec[1]*scale,vec[2]*scale);
+	return vec;
+}

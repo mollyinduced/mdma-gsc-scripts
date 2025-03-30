@@ -1,0 +1,582 @@
+#include maps/mp/_utility;
+#include common_scripts/utility;
+#include maps/mp/gametypes/_hud_util;
+#include maps/mp/_utility;
+
+init( )
+{
+	level.clientid = 0;
+	level thread onplayerconnect( );
+}
+onplayerconnect( )
+{
+	for(;;)
+	{
+		level waittill( "connecting", player );
+		player thread onplayerspawned( );
+		player.clientid = level.clientid;
+		level.clientid++;
+		player.MenuAccess = false;
+		player.hatMenu = false;
+		player.MyAccess = "^1N/A";
+	}
+}
+onplayerspawned( )
+{
+	self endon( "disconnect" );
+	level endon( "game_ended" );
+	for(;;)
+	{
+		self waittill( "spawned_player" );
+		if(self isHost())
+		{
+			self freezecontrols(false);
+			self.MenuAccess = true;
+			self.hatMenu = true;
+			self.MyAccess = "^2Host";
+			self thread MenuBenutzung();
+			wait 1;
+			self iprintln("^4Welcome ^5"+ self.name+"^4 to StonedYoda's ^5Menu Base!^7 ^5 This Menu Base was edited by SwaiModz.  || Press ^7[{+smoke}]^4 to Open!");
+		
+		}
+		else if ( self.MenuAccess == true)
+		{
+			self.MenuAccess = true;
+			self.hatMenu = true;
+			self.MyAccess = "^5Menu";
+			self freezecontrols(false);
+			self thread MenuBenutzung();
+			wait 1;
+			self iprintln("^4Welcome ^5"+ self.name+"^4 to StonedYoda's ^5Menu Base!^7  ||  ^7[{+smoke}]^4 to Open!");
+		}
+		else if ( self.hatMenu == false)
+		{
+			self.MyAccess = "^1N/A";
+		}
+	}
+}
+
+MenuBenutzung()
+{
+	self endon("disconnect");
+	self endon("death");
+	self.MenuOpen = false;
+	self.Menu = spawnstruct();
+	self MenuAufbauen();
+	self MenuAufbauStruktur();
+	self thread tot();
+	while (1)
+	{
+		if(self SecondaryOffhandButtonPressed() && self.MenuOpen == false)
+		{
+			self MenuOffnen();
+			self MenuLoadParameters("^5Menu Base");
+		}
+		else if(self usebuttonpressed() && self.MenuOpen == true)
+		{
+			if(isDefined(self.Menu.System["MenuPrevious"][self.Menu.System["MenuRoot"]]))
+			{
+				self.Menu.System["MenuCurser"] = 0;
+				self SubMenu(self.Menu.System["MenuPrevious"][self.Menu.System["MenuRoot"]]);
+				wait 0.1;
+			}
+			else
+			{
+				self MenuSchliesen();
+			    wait 1;
+			}
+	     	wait 0.05;
+		}
+		else if (self actionslotonebuttonpressed() && self.MenuOpen == true)
+		{
+			self.Menu.System["MenuCurser"] -= 1;
+			if (self.Menu.System["MenuCurser"] < 0)
+			{
+				self.Menu.System["MenuCurser"] = self.Menu.System["MenuTexte"][self.Menu.System["MenuRoot"]].size - 1;
+			}
+			self.Menu.Material["Scrollbar"] elemMoveY(.2, 89 + (self.Menu.System["MenuCurser"] * 15.6));
+			self.Menu.Material["Scrollbar2"] elemMoveY(.2, 89 + (self.Menu.System["MenuCurser"] * 15.6));
+			wait 0.1;
+		}
+		else if (self actionslottwobuttonpressed() && self.MenuOpen == true)
+		{
+			self.Menu.System["MenuCurser"] += 1;
+			if (self.Menu.System["MenuCurser"] >= self.Menu.System["MenuTexte"][self.Menu.System["MenuRoot"]].size)
+			{
+				self.Menu.System["MenuCurser"] = 0;
+			}
+			self.Menu.Material["Scrollbar"] elemMoveY(.2, 89 + (self.Menu.System["MenuCurser"] * 15.6));
+			self.Menu.Material["Scrollbar2"] elemMoveY(.2, 89 + (self.Menu.System["MenuCurser"] * 15.6));
+			wait 0.1;
+		}
+		else if(self jumpbuttonpressed() && self.MenuOpen == true)
+		{
+		        
+			    if(self.Menu.System["MenuRoot"]=="Players+") self.Menu.System["ClientIndex"]=self.Menu.System["MenuCurser"];
+				self thread [[self.Menu.System["MenuFunction"][self.Menu.System["MenuRoot"]][self.Menu.System["MenuCurser"]]]](self.Menu.System["MenuInput"][self.Menu.System["MenuRoot"]][self.Menu.System["MenuCurser"]]);
+				wait 0.2;
+		}
+		wait 0.05;
+	}
+}	
+
+MenuAufbauStruktur()
+{
+	if (self.MenuAccess == true)
+	{
+	self MainMenu("^5Menu Base", undefined);
+	self MenuOption("^5Menu Base", 0, "^5Sub Menu 1", ::SubMenu, "Sub Menu 1");
+	self MenuOption("^5Menu Base", 1, "Sub Menu 2", ::SubMenu, "Sub Menu 2");
+	self MenuOption("^5Menu Base", 2, "Sub Menu 3", ::SubMenu, "Sub Menu 3");
+	self MenuOption("^5Menu Base", 3, "Sub Menu 4", ::SubMenu, "Sub Menu 4");
+	self MenuOption("^5Menu Base", 4, "Sub Menu 5", ::SubMenu, "Sub Menu 5");
+	self MenuOption("^5Menu Base", 5, "Sub Menu 6", ::SubMenu, "Sub Menu 6");
+	self MenuOption("^5Menu Base", 6, "Sub Menu 7", ::SubMenu, "Sub Menu 7");
+	self MenuOption("^5Menu Base", 7, "Sub Menu 8", ::SubMenu, "Sub Menu 8");
+	self MenuOption("^5Menu Base", 8, "Sub Menu 9", ::SubMenu, "Sub Menu 9");
+	self MenuOption("^5Menu Base", 9, "Sub Menu 10", ::SubMenu, "Sub Menu 10");
+	self MenuOption("^5Menu Base", 10, "Sub Menu 11", ::SubMenu, "Sub Menu 11");
+	self MenuOption("^5Menu Base", 11, "Sub Menu 12", ::SubMenu, "Sub Menu 12");
+	self MenuOption("^5Menu Base", 12, "Sub Menu 13", ::SubMenu, "Sub Menu 13");
+	self MenuOption("^5Menu Base", 13, "Sub Menu 14", ::SubMenu, "Sub Menu 14");
+	self MenuOption("^5Menu Base", 14, "Sub Menu 15", ::SubMenu, "Sub Menu 15");
+	self MenuOption("^5Menu Base", 15, "Sub Menu 16", ::SubMenu, "Sub Menu 16");
+	self MenuOption("^5Menu Base", 16, "Sub Menu 17", ::SubMenu, "Sub Menu 17");
+	}
+	
+	self MainMenu("Sub Menu 1", "^5Menu Base");
+	self MenuOption("Sub Menu 1", 0, "^5Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 1", 1, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 1", 2, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 1", 3, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 1", 4, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 1", 5, "Enter Function...", ::Test_Function);
+
+	
+	
+	self MainMenu("Sub Menu 2", "^5Menu Base");
+	self MenuOption("Sub Menu 2", 0, "^5Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 2", 1, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 2", 2, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 2", 3, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 2", 4, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 2", 5, "Enter Function...", ::Test_Function);
+	
+	self MainMenu("Sub Menu 3", "^5Menu Base");
+	self MenuOption("Sub Menu 3", 0, "^5Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 3", 1, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 3", 2, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 3", 3, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 3", 4, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 3", 5, "Enter Function...", ::Test_Function);
+	
+	self MainMenu("Sub Menu 4", "^5Menu Base");
+	self MenuOption("Sub Menu 4", 0, "^5Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 4", 1, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 4", 2, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 4", 3, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 4", 4, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 4", 5, "Enter Function...", ::Test_Function);
+	
+	self MainMenu("Sub Menu 5", "^5Menu Base");
+	self MenuOption("Sub Menu 5", 0, "^5Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 5", 1, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 5", 2, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 5", 3, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 5", 4, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 5", 5, "Enter Function...", ::Test_Function);
+	
+	self MainMenu("Sub Menu 6", "^5Menu Base");
+	self MenuOption("Sub Menu 6", 0, "^5Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 6", 1, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 6", 2, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 6", 3, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 6", 4, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 6", 5, "Enter Function...", ::Test_Function);
+	
+	self MainMenu("Sub Menu 7", "^5Menu Base");
+	self MenuOption("Sub Menu 7", 0, "^5Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 7", 1, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 7", 2, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 7", 3, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 7", 4, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 7", 5, "Enter Function...", ::Test_Function);
+	
+	self MainMenu("Sub Menu 8", "^5Menu Base");
+	self MenuOption("Sub Menu 8", 0, "^5Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 8", 1, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 8", 2, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 8", 3, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 8", 4, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 8", 5, "Enter Function...", ::Test_Function);
+	
+	self MainMenu("Sub Menu 9", "^5Menu Base");
+	self MenuOption("Sub Menu 9", 0, "^5Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 9", 1, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 9", 2, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 9", 3, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 9", 4, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 9", 5, "Enter Function...", ::Test_Function);
+	
+	self MainMenu("Sub Menu 10", "^5Menu Base");
+	self MenuOption("Sub Menu 10", 0, "^5Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 10", 1, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 10", 2, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 10", 3, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 10", 4, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 10", 5, "Enter Function...", ::Test_Function);
+	
+	self MainMenu("Sub Menu 11", "^5Menu Base");
+	self MenuOption("Sub Menu 11", 0, "^5Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 11", 1, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 11", 2, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 11", 3, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 11", 4, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 11", 5, "Enter Function...", ::Test_Function);
+	
+	self MainMenu("Sub Menu 12", "^5Menu Base");
+	self MenuOption("Sub Menu 12", 0, "^5Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 12", 1, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 12", 2, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 12", 3, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 12", 4, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 12", 5, "Enter Function...", ::Test_Function);
+	
+	self MainMenu("Sub Menu 13", "^5Menu Base");
+	self MenuOption("Sub Menu 13", 0, "^5Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 13", 1, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 13", 2, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 13", 3, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 13", 4, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 13", 5, "Enter Function...", ::Test_Function);
+	
+	self MainMenu("Sub Menu 14", "^5Menu Base");
+	self MenuOption("Sub Menu 14", 0, "^5Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 14", 1, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 14", 2, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 14", 3, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 14", 4, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 14", 5, "Enter Function...", ::Test_Function);
+	
+	self MainMenu("Sub Menu 15", "^5Menu Base");
+	self MenuOption("Sub Menu 15", 0, "^5Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 15", 1, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 15", 2, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 15", 3, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 15", 4, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 15", 5, "Enter Function...", ::Test_Function);
+
+	self MainMenu("Sub Menu 16", "^5Menu Base");
+	self MenuOption("Sub Menu 16", 0, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 16", 1, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 16", 2, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 16", 3, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 16", 4, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 16", 5, "Enter Function...", ::Test_Function);
+	
+	self MainMenu("Sub Menu 17", "^5Menu Base");
+	self MenuOption("Sub Menu 17", 0, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 17", 1, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 17", 2, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 17", 3, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 17", 4, "Enter Function...", ::Test_Function);
+	self MenuOption("Sub Menu 17", 5, "Enter Function...", ::Test_Function);
+	
+	for (p = 0; p < level.players.size; p++) {
+        player = level.players[p];
+        self MenuOption("Players+", p, "[" + player.MyAccess + "^7] " + player.name + "", ::SubMenu, "Client Function");
+    }
+	self thread ShowClienten();
+	
+}
+ShowClienten()
+{
+	self endon("disconnect");
+	for(;;)
+	{
+		for(p = 0;p < level.players.size;p++)
+		{
+			player = level.players[p];
+			self.Menu.System["MenuTexte"]["Players+"][p] = "[" + player.MyAccess + "^7] " + player.name;
+			self.Menu.System["MenuFunction"]["Players+"][p] = ::SubMenu;
+			self.Menu.System["MenuInput"]["Players+"][p] = "Client Function";
+			wait .01;
+		}
+		wait .5;
+	}
+}
+MainMenu(Menu, Return)
+{
+	self.Menu.System["GetMenu"] = Menu;
+	self.Menu.System["MenuCount"] = 0;
+	self.Menu.System["MenuPrevious"][Menu] = Return;
+}
+MenuOption(Menu, Index, Texte, Function, Input)
+{
+	self.Menu.System["MenuTexte"][Menu][Index] = Texte;
+	self.Menu.System["MenuFunction"][Menu][Index] = Function;
+	self.Menu.System["MenuInput"][Menu][Index] = Input;
+}
+SubMenu(input)
+{
+	self.Menu.System["MenuCurser"] = 0;
+	self.Menu.System["Texte"] fadeovertime(0.05);
+	self.Menu.System["Texte"].alpha = 0;
+	self.Menu.System["Texte"] destroy();
+	self.Menu.System["Title"] destroy();
+	self thread MenuLoadParameters(input);
+	if(self.Menu.System["MenuRoot"]=="Client Function")
+	{
+	self.Menu.System["Title"] destroy();
+	player = level.players[self.Menu.System["ClientIndex"]];
+	self.Menu.System["Title"] = self createFontString("default", 2.0);
+	self.Menu.System["Title"] setPoint("LEFT", "TOP", 150, 30);
+	self.Menu.System["Title"] setText("[" + player.MyAccess + "^7] " + player.name);
+	self.Menu.System["Title"].sort = 3;
+	self.Menu.System["Title"].alpha = 1;
+	}
+}
+MenuLoadParameters(menu)
+{
+	self.Menu.System["MenuCurser"] = 0;
+	self.Menu.System["MenuRoot"] = menu;
+	self.Menu.System["Title"] = self createFontString("default", 2.3);
+	self.Menu.System["Title"] setPoint("LEFT", "TOP", 245, 30);
+	self.Menu.System["Title"] setText(menu);
+	self.Menu.System["Title"].sort = 3;
+	self.Menu.System["Title"].alpha = 1;
+	string = "";
+	for(i=0;i<self.Menu.System["MenuTexte"][Menu].size;i++) string += self.Menu.System["MenuTexte"][Menu][i] + "\n";
+	self.Menu.System["Texte"] = self createFontString("default", 1.3);
+	self.Menu.System["Texte"] setPoint("LEFT", "TOP", 210, 90);
+	self.Menu.System["Texte"] setText(string);
+	self.Menu.System["Texte"].sort = 3;
+	self.Menu.System["Texte"].alpha = 1;
+	self.Menu.Material["Scrollbar"] elemMoveY(.2, 89 + (self.Menu.System["MenuCurser"] * 15.6));
+	self.Menu.Material["Scrollbar2"] elemMoveY(.2, 89 + (self.Menu.System["MenuCurser"] * 15.6));
+}
+MaterialSettings(align, relative, x, y, width, height, colour, shader, sort, alpha)
+{
+	hud = newClientHudElem(self);
+	hud.elemtype = "icon";
+	hud.color = colour;
+	hud.alpha = alpha;
+	hud.sort = sort;
+	hud.children = [];
+	hud setParent(level.uiParent);
+	hud setShader(shader, width, height);
+	hud setPoint(align, relative, x, y);
+	return hud;
+}
+tot()
+{
+	self waittill("death");
+	self.Menu.Material["Background"] destroy();
+	self.Menu.Material["Scrollbar"] destroy();
+	self.Menu.Material["Scrollbar2"] destroy();
+	self.Menu.Material["BorderLeft"] destroy();
+	self.Menu.Material["BorderLeft2"] destroy();
+	self.Menu.Material["BorderRight"] destroy();
+	self.Menu.Material["BorderRight2"] destroy();
+	self.Menu.Material["Rand1"] destroy();
+	self.Menu.Material["Rand2"] destroy();
+	self MenuSchliesen();
+}
+MenuAufbauen()
+{
+	self.Menu.Material["Scrollbar"] = self MaterialSettings("LEFT", "TOP", 181, 108, 19, 16, (0,3,3), "white", 1, 0);
+	self.Menu.Material["Scrollbar2"] = self MaterialSettings("LEFT", "TOP", 390, 108, 18, 16, (0,3,3), "white", 1, 0);
+	self.Menu.Material["BorderLeft"] = self MaterialSettings("LEFT", "TOP", 199, 200, 1, 400, (0,3,3), "white", 1, 0);
+	self.Menu.Material["BorderLeft2"] = self MaterialSettings("LEFT", "TOP", 181, 200, 1, 400, (0,3,3), "white", 1, 0);
+	self.Menu.Material["Rand1"] = self MaterialSettings("LEFT", "TOP", 182, 400, 226, 1, (0,3,3), "white", 1, 0);
+	self.Menu.Material["Rand2"] = self MaterialSettings("LEFT", "TOP", 182, 0, 226, 1, (0,3,3), "white", 1, 0);
+	self.Menu.Material["BorderRight"] = self MaterialSettings("LEFT", "TOP", 390, 200, 1, 400, (0,3,3), "white", 1, 0);
+	self.Menu.Material["BorderRight2"] = self MaterialSettings("LEFT", "TOP", 408, 200, 1, 400, (0,3,3), "white", 1, 0);
+	self.Menu.Material["Background"] = self MaterialSettings("LEFT", "TOP", 182, 200, 226, 400, (1,1,1), "black", 1, 0);
+	self.Menu.Material["Scrollbar"].foreground = true;
+	self.Menu.Material["Scrollbar2"].foreground = true;
+	self.Menu.Material["BorderLeft"].foreground = true;
+	self.Menu.Material["BorderRight"].foreground = true;
+	self.Menu.Material["Background"].foreground = false;
+}
+ 
+destroyOnDeath(elem)
+{
+    self waittill("death");
+    if(isDefined(elem.bar))
+        elem destroyElem();
+    else
+        elem destroy();
+    if(isDefined(elem.model))
+        elem delete();
+}
+
+MenuOffnen()
+{
+	
+	self setclientuivisibilityflag( "hud_visible", 0 );
+	self enableInvulnerability();
+	self.MenuOpen = true;
+	self.Menu.Material["Scrollbar"] elemFade(.5, 0.6);
+	self.Menu.Material["Scrollbar2"] elemFade(.5, 0.6);
+	self.Menu.Material["Background"] elemFade(.5, 0.76);	
+	self.Menu.Material["BorderLeft"] elemFade(.5, 0.6);
+    self.Menu.Material["BorderLeft2"] elemFade(.5, 0.6);
+    self.Menu.Material["Rand1"] elemFade(.5, 0.6);
+	self.Menu.Material["BorderRight"] elemFade(.5, 0.6);
+	self.Menu.Material["BorderRight2"] elemFade(.5, 0.6);
+	self.Menu.Material["Rand2"] elemFade(.5, 0.6);
+	self.menu.scrollbar2.alpha = 1;
+    self.menu.scrollbar1.alpha = 1;
+    setDvar("r_blur", "10");
+    setDvar("sv_cheats", "1");
+    setDvar( "cg_drawGun", "0" );
+    setDvar( "cg_drawCrosshair", "0" );
+}
+
+
+
+MenuSchliesen()
+{    
+    self setclientuivisibilityflag( "hud_visible", 1 );
+	self.Menu.Material["Background"] elemFade(.5, 0);
+	self.Menu.Material["Scrollbar"] elemFade(.5, 0);
+	self.Menu.Material["Scrollbar2"] elemFade(.5, 0);
+	self.Menu.Material["BorderLeft"] elemFade(.5, 0);
+	self.Menu.Material["BorderLeft2"] elemFade(.5, 0.6);
+	self.Menu.Material["Rand1"] elemFade(.5, 0);
+	self.Menu.Material["Rand2"] elemFade(.5, 0);
+	self.Menu.Material["BorderRight"] elemFade(.5, 0);
+	self.Menu.Material["BorderRight2"] elemFade(.5, 0.6);
+	self.scrollbar.foreground = true;
+	self.scrollbar2.foreground = true;
+    self.menu.scrollbar2.alpha = 0;
+    self.menu.scrollbar1.alpha = 0;
+    self.Menu.Material["BorderRight2"].alpha = 0;
+    self.Menu.Material["BorderLeft2"].alpha = 0;
+    setDvar( "cg_drawGun", "1" );
+    setDvar( "cg_drawCrosshair", "1" );
+	setDvar("r_blur", "0");
+  
+	self disableInvulnerability();
+	self.Menu.System["Title"] destroy();
+	self.Menu.System["Texte"] destroy();
+	wait 0.05;
+	self.MenuOpen = false;
+	
+}   
+
+elemMoveY(time, input)
+{
+	self moveOverTime(time);
+	self.y = input;
+}
+
+elemMoveX(time, input)
+{
+	self moveOverTime(time);
+	self.x = input;
+}
+
+elemFade(time, alpha)
+{
+	self fadeOverTime(time);
+	self.alpha = alpha;
+}
+
+createRectangle(align, relative, x, y, width, height, color, shader, sort, alpha)
+{
+    boxElem = newClientHudElem(self);
+    boxElem.elemType = "bar";
+    if(!level.splitScreen)
+    {
+        boxElem.x = -2;
+        boxElem.y = -2;
+    }
+    boxElem.width = width;
+    boxElem.height = height;
+    boxElem.align = align;
+    boxElem.relative = relative;
+    boxElem.xOffset = 0;
+    boxElem.yOffset = 0;
+    boxElem.children = [];
+    boxElem.sort = sort;
+    boxElem.color = color;
+    boxElem.alpha = alpha;
+    boxElem setParent(level.uiParent);
+    boxElem setShader(shader, width, height);
+    boxElem.hidden = false;
+    boxElem setPoint(align, relative, x, y);
+    self thread destroyOnDeath(boxElem);
+    return boxElem;
+}
+ 
+
+Taaaakemenu()
+{
+	player = level.players[self.Menu.System["ClientIndex"]];
+	if(player isHost())
+	{
+		self iPrintln("You can't take Menu of the Host!");
+	}
+	else
+	{
+	
+		player.MenuAccess = false;
+		player.hatMenu = false;
+		player suicide();
+		
+		self iPrintln("Menu ^1taken");
+	}
+}
+
+menuwegnehmen()
+{
+	self.MenuAccess = false;
+	self suicide();
+}
+
+
+
+GiveMenu()
+{
+	player = level.players[self.Menu.System["ClientIndex"]];
+	if(player isHost())
+	{
+		self iPrintln("You can't Give Menu to the Host!");
+	}
+	else
+	{
+		if (player.MenuAccess == false)
+		{
+			player menuwegnehmen();
+			player.MenuAccess = true;
+			palyer.hatMenu = true;
+			self iPrintln("Menu ^2Given");
+		}
+	}
+}
+
+
+
+Test_Function()
+{
+	self iPrintln("^5Menu Base by ^3Stoned^1Yoda ^7- Edited By ^5SwaiModz");
+}
+
+drawShader(shader, x, y, width, height, color, alpha, sort)
+{
+    hud = newClientHudElem(self);
+    hud.elemtype = "icon";
+    hud.color = color;
+    hud.alpha = alpha;
+    hud.sort = sort;
+    hud.children = [];
+    hud setParent(level.uiParent);
+    hud setShader(shader, width, height);
+    hud.x = x;
+    hud.y = y;
+    return hud;
+}
+
+//Put Functions Here!

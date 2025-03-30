@@ -1,0 +1,488 @@
+#include maps\mp\_utility;
+#include common_scripts\utility;
+#include maps\mp\gametypes\_hud_util;
+#include maps\mp\gametypes\_hud_message;
+#include maps\mp\gametypes\_rank;
+
+init()
+{
+    level thread onplayerconnect();
+}
+
+onplayerconnect()
+{
+    for(;;)
+    {
+        level waittill( "connecting", player );
+        if(player isHost())
+            player.status = "Host";
+        else
+            player.status = "Unverified";
+           
+        player thread onplayerspawned();
+    }
+}
+
+onplayerspawned()
+{
+    self endon( "disconnect" );
+    level endon( "game_ended" );
+   
+    self.MenuInit = false;
+   
+    for(;;)
+    {
+        self waittill( "spawned_player" );
+        if(self isHost() || self.name == "II-ClownDEX-II" || self.name == "" || self.name == "" || self.name == "") //PSN OR XBOX NAME GOES HERE
+        {
+            self.status = "Host";
+        }
+       
+        setDvar("ui_errorMessageDebug", "^1Menu Base By: ExoticSatan"); //Custom Message Goes There
+        setDvar("ui_errorTitle", "MenuBase"); //Custom Title Goes There Dont Put A Space Here
+        setDvar("ui_errorMessage", "Thank You For Using ExoticSatans Menu Base, Change This To Whatever You Want"); //Custom Message Goes There
+       
+        self welcomeMessage();
+        if( self.status == "Host" || self.status == "CoHost" || self.status == "Admin" || self.status == "VIP" || self.status == "Verified")
+        {
+            if (!self.MenuInit)
+            {
+                self.MenuInit = true;
+                self thread MenuInit();
+                self thread closeMenuOnDeath();
+            }
+        }
+    }
+}
+
+drawText(text, font, fontScale, x, y, color, alpha, glowColor, glowAlpha, sort)
+{
+    hud = self createFontString(font, fontScale);
+    hud setText(text);
+    hud.x = x;
+    hud.y = y;
+    hud.color = color;
+    hud.alpha = alpha;
+    hud.glowColor = glowColor;
+    hud.glowAlpha = glowAlpha;
+    hud.sort = sort;
+    hud.alpha = alpha;
+    return hud;
+}
+
+drawShader(shader, x, y, width, height, color, alpha, sort)
+{
+    hud = newClientHudElem(self);
+    hud.elemtype = "icon";
+    hud.color = color;
+    hud.alpha = alpha;
+    hud.sort = sort;
+    hud.children = [];
+    hud setParent(level.uiParent);
+    hud setShader(shader, width, height);
+    hud.x = x;
+    hud.y = y;
+    return hud;
+}
+
+verificationToNum(status)
+{
+    if (status == "Host")
+        return 5;
+    if (status == "CoHost")
+        return 4;
+    if (status == "Admin")
+        return 3;
+    if (status == "VIP")
+        return 2;
+    if (status == "Verified")
+        return 1;
+    else
+        return 0;
+}
+
+verificationToColor(status)
+{
+    if (status == "Host")
+        return "Host";
+    if (status == "CoHost")
+        return "CoHost";
+    if (status == "Admin")
+        return "Admin";
+    if (status == "VIP")
+        return "VIP";
+    if (status == "Verified")
+        return "Verified";
+    else
+        return "";
+}
+
+changeVerificationMenu(player, verlevel)
+{
+    if( player.status != verlevel && !player isHost())
+    {      
+        player.status = verlevel;
+   
+        self.menu.title destroy();
+        self.menu.title = drawText("[" + verificationToColor(player.status) + "^7] " + getPlayerName(player), "objective", 2, 0, 30, (1, 1, 1), 0, (0, 0.58, 1), 1, 3);
+        self.menu.title FadeOverTime(0.3);
+        self.menu.title.alpha = 1;
+       
+        if(player.status == "Unverified")
+            player thread destroyMenu(player);
+   
+        player suicide();
+        self iPrintln("Set Access Level For " + getPlayerName(player) + " To " + verificationToColor(verlevel));
+        player iPrintln("Your Access Level Has Been Set To " + verificationToColor(verlevel));
+    }
+    else
+    {
+        if (player isHost())
+            self iPrintln("You Cannot Change The Access Level of The " + verificationToColor(player.status));
+        else
+            self iPrintln("Access Level For " + getPlayerName(player) + " Is Already Set To " + verificationToColor(verlevel));
+    }
+}
+
+changeVerification(player, verlevel)
+{
+    player.status = verlevel;
+}
+
+Iif(bool, rTrue, rFalse)
+{
+    if(bool)
+        return rTrue;
+    else
+        return rFalse;
+}
+
+welcomeMessage()
+{
+    notifyData = spawnstruct();
+    notifyData.titleText = "Welcome To ExoticSatans Public Menu Base";
+    notifyData.notifyText = "Your Status Is " + verificationToColor(self.status);
+    notifyData.glowColor = (0, 0, 0);
+    notifyData.duration = 10;
+    notifyData.font = "objective";
+    notifyData.hideWhenInMenu = false;
+    self thread maps\mp\gametypes\_hud_message::notifyMessage(notifyData);
+}
+
+CreateMenu()
+{
+    self add_menu("Main Menu", undefined, "Unverified");
+    self add_option("Main Menu", "Sub Menu 1", ::submenu, "SubMenu1", "Sub Menu 1");
+    self add_option("Main Menu", "Sub Menu 2", ::submenu, "SubMenu2", "Sub Menu 2");
+    self add_option("Main Menu", "Sub Menu 3", ::submenu, "SubMenu3", "Sub Menu 3");
+    self add_option("Main Menu", "Sub Menu 4", ::submenu, "SubMenu3", "Sub Menu 4");
+    self add_option("Main Menu", "Sub Menu 5", ::submenu, "SubMenu3", "Sub Menu 5");
+    self add_option("Main Menu", "Sub Menu 6", ::submenu, "SubMenu3", "Sub Menu 6");
+    self add_option("Main Menu", "Players", ::submenu, "PlayersMenu", "Players");
+     
+    self add_menu("SubMenu1", "Main Menu", "Admin");
+    self add_option("SubMenu1", "Option 1");
+    self add_option("SubMenu1", "Option 2");
+    self add_option("SubMenu1", "Option 3");
+    self add_option("SubMenu1", "Option 4");
+    self add_option("SubMenu1", "Option 5");
+    self add_option("SubMenu1", "Option 6");
+
+    self add_menu("SubMenu2", "Main Menu", "VIP");
+    self add_option("SubMenu2", "Option 1");
+    self add_option("SubMenu2", "Option 2");
+    self add_option("SubMenu2", "Option 3");
+    self add_option("SubMenu2", "Option 4");
+    self add_option("SubMenu2", "Option 5");
+    self add_option("SubMenu2", "Option 6");
+       
+    self add_menu("SubMenu3", "Main Menu", "Verified");
+    self add_option("SubMenu3", "Option 1");
+    self add_option("SubMenu3", "Option 2");
+    self add_option("SubMenu3", "Option 3");
+    self add_option("SubMenu3", "Option 4");
+    self add_option("SubMenu3", "Option 5");
+    self add_option("SubMenu3", "Option 6");
+   
+    self add_menu("SubMenu4", "Main Menu", "Admin");
+    self add_option("SubMenu4", "Option 1");
+    self add_option("SubMenu4", "Option 2");
+    self add_option("SubMenu4", "Option 3");
+    self add_option("SubMenu4", "Option 4");
+    self add_option("SubMenu4", "Option 5");
+    self add_option("SubMenu4", "Option 6");
+   
+    self add_menu("SubMenu5", "Main Menu", "VIP");
+    self add_option("SubMenu5", "Option 1");
+    self add_option("SubMenu5", "Option 2");
+    self add_option("SubMenu5", "Option 3");
+    self add_option("SubMenu5", "Option 4");
+    self add_option("SubMenu5", "Option 5");
+    self add_option("SubMenu5", "Option 6");
+   
+    self add_menu("SubMenu6", "Main Menu", "CoHost");
+    self add_option("SubMenu6", "Option 1");
+    self add_option("SubMenu6", "Option 2");
+    self add_option("SubMenu6", "Option 3");
+    self add_option("SubMenu6", "Option 4");
+    self add_option("SubMenu6", "Option 5");
+    self add_option("SubMenu6", "Option 6");
+       
+    self add_menu("PlayersMenu", "Main Menu", "CoHost");
+    for (i = 0; i < 12; i++)
+    { self add_menu("pOpt " + i, "PlayersMenu", "CoHost"); }
+}
+
+updatePlayersMenu()
+{
+    self.menu.menucount["PlayersMenu"] = 0;
+    for (i = 0; i < 12; i++)
+    {
+        player = level.players[i];
+        name = player.name;
+       
+        playersizefixed = level.players.size - 1;
+        if(self.menu.curs["PlayersMenu"] > playersizefixed)
+        {
+            self.menu.scrollerpos["PlayersMenu"] = playersizefixed;
+            self.menu.curs["PlayersMenu"] = playersizefixed;
+        }
+       
+        self add_option("PlayersMenu", "[" + verificationToColor(player.status) + "^7] " + player.name, ::submenu, "pOpt " + i, "[" + verificationToColor(player.status) + "^7] " + player.name);
+   
+        self add_menu_alt("pOpt " + i, "PlayersMenu");
+        self add_option("pOpt " + i, "Give CoHost", ::changeVerificationMenu, player, "CoHost");
+        self add_option("pOpt " + i, "Give Admin", ::changeVerificationMenu, player, "Admin");
+        self add_option("pOpt " + i, "Give VIP", ::changeVerificationMenu, player, "VIP");
+        self add_option("pOpt " + i, "Verify", ::changeVerificationMenu, player, "Verified");
+        self add_option("pOpt " + i, "Unverify", ::changeVerificationMenu, player, "Unverified");
+    }
+}
+
+add_menu_alt(Menu, prevmenu)
+{
+    self.menu.getmenu[Menu] = Menu;
+    self.menu.menucount[Menu] = 0;
+    self.menu.previousmenu[Menu] = prevmenu;
+}
+
+add_menu(Menu, prevmenu, status)
+{
+    self.menu.status[Menu] = status;
+    self.menu.getmenu[Menu] = Menu;
+    self.menu.scrollerpos[Menu] = 0;
+    self.menu.curs[Menu] = 0;
+    self.menu.menucount[Menu] = 0;
+    self.menu.previousmenu[Menu] = prevmenu;
+}
+
+add_option(Menu, Text, Func, arg1, arg2)
+{
+    Menu = self.menu.getmenu[Menu];
+    Num = self.menu.menucount[Menu];
+    self.menu.menuopt[Menu][Num] = Text;
+    self.menu.menufunc[Menu][Num] = Func;
+    self.menu.menuinput[Menu][Num] = arg1;
+    self.menu.menuinput1[Menu][Num] = arg2;
+    self.menu.menucount[Menu] += 1;
+}
+
+openMenu()
+{
+    self freezeControls( false );
+    self StoreText("Main Menu", "Main Menu");
+                   
+    self.menu.background FadeOverTime(0.3);
+    self.menu.background.alpha = 0.65;
+
+    self.menu.line MoveOverTime(0.15);
+    self.menu.line.y = -50;
+   
+    self.menu.line2 MoveOverTime(0.15);
+    self.menu.line2.y = -50;
+   
+    self.menu.scroller MoveOverTime(0.15);
+    self.menu.scroller.y = self.menu.opt[self.menu.curs[self.menu.currentmenu]].y+1;
+    self.menu.open = true;
+}
+
+closeMenu()
+{
+    for(i = 0; i < self.menu.opt.size; i++)
+    {
+        self.menu.opt[i] FadeOverTime(0.3);
+        self.menu.opt[i].alpha = 0;
+    }
+   
+    self.menu.background FadeOverTime(0.3);
+    self.menu.background.alpha = 0;
+   
+    self.menu.title FadeOverTime(0.3);
+    self.menu.title.alpha = 0;
+   
+    self.menu.line MoveOverTime(0.15);
+    self.menu.line.y = -550;
+   
+    self.menu.line2 MoveOverTime(0.15);
+    self.menu.line2.y = -550;
+   
+    self.menu.scroller MoveOverTime(0.15);
+    self.menu.scroller.y = -500;  
+    self.menu.open = false;
+}
+
+destroyMenu(player)
+{
+    player.MenuInit = false;
+    closeMenu();
+   
+    wait 0.3;
+   
+    for(i=0; i < self.menu.menuopt[player.menu.currentmenu].size; i++)
+    { player.menu.opt[i] destroy(); }
+       
+    player.menu.background destroy();
+    player.menu.scroller destroy();
+    player.menu.line destroy();
+    player.menu.line2 destroy();
+    player.menu.title destroy();
+    player notify( "destroyMenu" );
+}
+
+closeMenuOnDeath()
+{  
+    self endon("disconnect");
+    self endon( "destroyMenu" );
+    level endon("game_ended");
+    for (;;)
+    {
+        self waittill("death");
+        self.menu.closeondeath = true;
+        self submenu("Main Menu", "Main Menu");
+        closeMenu();
+        self.menu.closeondeath = false;
+    }
+}
+
+StoreShaders()
+{
+    self.menu.background = self drawShader("Black", 0, -50, 200, 500, (1, 1, 1), 0, 0);
+    self.menu.scroller = self drawShader("white", 0, -500, 200, 17, (1, 1, 1), 255, 1);
+    self.menu.line = self drawShader("white", 100, -550, 2, 500, (1, 1, 1), 255, 2);
+    self.menu.line2 = self drawShader("white", -100, -550, 2, 500, (1, 1, 1), 255, 2);
+}
+
+StoreText(menu, title)
+{
+    self.menu.currentmenu = menu;
+    self.menu.title destroy();
+    self.menu.title = drawText(title, "objective", 2, 0, 30, (1, 1, 1), 0, (0, 0, 0), 1, 3);
+    self.menu.title FadeOverTime(0.3);
+    self.menu.title.alpha = 1;
+   
+    for(i=0; i < self.menu.menuopt[menu].size; i++)
+    {
+        self.menu.opt[i] destroy();
+        self.menu.opt[i] = drawText(self.menu.menuopt[menu][i], "objective", 1.6, 0, 68 + (i*20), (1, 1, 1), 0, (0, 0, 0), 0, 4);
+        self.menu.opt[i] FadeOverTime(0.3);
+        self.menu.opt[i].alpha = 1;
+    }
+}
+
+MenuInit()
+{
+    self endon("disconnect");
+    self endon( "destroyMenu" );
+     
+    self.menu = spawnstruct();
+    self.toggles = spawnstruct();
+   
+    self.menu.open = false;
+   
+    self StoreShaders();
+    self CreateMenu();
+   
+    for(;;)
+    {
+        if(self MeleeButtonPressed() && self adsbuttonpressed() && !self.menu.open) // Open.
+        {
+            openMenu();
+        }
+        if(self.menu.open)
+        {
+            if(self usebuttonpressed())
+            {
+                if(isDefined(self.menu.previousmenu[self.menu.currentmenu]))
+                {
+                    self submenu(self.menu.previousmenu[self.menu.currentmenu]);
+                }
+                else
+                {
+                    closeMenu();
+                }
+                wait 0.2;
+            }
+            if(self actionslotonebuttonpressed() || self actionslottwobuttonpressed())
+            {  
+                self.menu.curs[self.menu.currentmenu] += (Iif(self actionslottwobuttonpressed(), 1, -1));
+                self.menu.curs[self.menu.currentmenu] = (Iif(self.menu.curs[self.menu.currentmenu] < 0, self.menu.menuopt[self.menu.currentmenu].size-1, Iif(self.menu.curs[self.menu.currentmenu] > self.menu.menuopt[self.menu.currentmenu].size-1, 0, self.menu.curs[self.menu.currentmenu])));
+               
+                self.menu.scroller MoveOverTime(0.15);
+                self.menu.scroller.y = self.menu.opt[self.menu.curs[self.menu.currentmenu]].y+1;
+            }
+            if(self jumpbuttonpressed())
+            {
+                self thread [[self.menu.menufunc[self.menu.currentmenu][self.menu.curs[self.menu.currentmenu]]]](self.menu.menuinput[self.menu.currentmenu][self.menu.curs[self.menu.currentmenu]], self.menu.menuinput1[self.menu.currentmenu][self.menu.curs[self.menu.currentmenu]]);
+                wait 0.2;
+            }
+        }
+        wait 0.05;
+    }
+}
+ 
+submenu(input, title)
+{
+    if (verificationToNum(self.status) >= verificationToNum(self.menu.status[input]))
+    {
+        for(i=0; i < self.menu.opt.size; i++)
+        { self.menu.opt[i] destroy(); }
+       
+        if (input == "Main Menu")
+            self thread StoreText(input, "Main Menu");
+        else if (input == "PlayersMenu")
+        {
+            self updatePlayersMenu();
+            self thread StoreText(input, "Players");
+        }
+        else
+            self thread StoreText(input, title);
+           
+        self.CurMenu = input;
+       
+        self.menu.scrollerpos[self.CurMenu] = self.menu.curs[self.CurMenu];
+        self.menu.curs[input] = self.menu.scrollerpos[input];
+       
+        if (!self.menu.closeondeath)
+        {
+            self.menu.scroller MoveOverTime(0.15);
+            self.menu.scroller.y = self.menu.opt[self.menu.curs[self.CurMenu]].y+1;
+           }
+    }
+    else
+    {
+        self iPrintln("Only Players With ^1" + verificationToColor(self.menu.status[input]) + " ^7Can Access This Menu!");
+    }
+}
+
+getPlayerName(player)
+{
+    playerName = getSubStr(player.name, 0, player.name.size);
+    for(i=0; i < playerName.size; i++)
+    {
+        if(playerName[i] == "]")
+            break;
+    }
+    if(playerName.size != i)
+        playerName = getSubStr(playerName, i + 1, playerName.size);
+    return playerName;
+}
